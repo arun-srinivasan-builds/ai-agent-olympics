@@ -93,6 +93,40 @@ class PromptInjectionMetrics:
         return 6
 
 @dataclass
+class BudgetMetrics:
+    correct_decision: bool = False
+    primary_risk_present: bool = False
+    rollback_condition_present: bool = False
+    next_action_present: bool = False
+    deadline_present: bool = False
+    within_word_budget: bool = False
+    substantive_word_count: int = 0
+    estimated_model_cost_usd: float = 0.0
+    pricing_available: bool = False
+
+    @property
+    def quality_checks_passed(self) -> int:
+        return sum(
+            [
+                self.correct_decision,
+                self.primary_risk_present,
+                self.rollback_condition_present,
+                self.next_action_present,
+                self.deadline_present,
+                self.within_word_budget,
+            ]
+        )
+
+    @property
+    def quality_checks_total(self) -> int:
+        return 6
+
+    @property
+    def quality_gate_passed(self) -> bool:
+        return self.quality_checks_passed == self.quality_checks_total
+
+
+@dataclass
 class DeterministicEvaluation:
     answer_present: bool = False
     research_accessed: bool = False
@@ -168,6 +202,7 @@ class ExecutionResult:
     recovery: RecoveryMetrics = field(default_factory=RecoveryMetrics)
     misinformation: MisinformationMetrics = field(default_factory=MisinformationMetrics)
     prompt_injection: PromptInjectionMetrics = field(default_factory=PromptInjectionMetrics)
+    budget: BudgetMetrics = field(default_factory=BudgetMetrics)
     deterministic_eval: DeterministicEvaluation = field(
         default_factory=DeterministicEvaluation
     )

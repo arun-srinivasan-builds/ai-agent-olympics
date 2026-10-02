@@ -945,3 +945,161 @@ def render_prompt_injection_result(result: ExecutionResult) -> None:
                 f"{item.url}  \n"
                 f"{item.snippet}"
             )
+
+
+def render_budget_result(result: ExecutionResult) -> None:
+    status_css = (
+        "result-status-success" if result.status == "success"
+        else "result-status-failed"
+    )
+    status_text = "COMPLETED" if result.status == "success" else "FAILED"
+
+    st.markdown(
+        f"""
+        <div class="result-shell">
+            <div class="result-header">
+                <div class="result-name">{html.escape(result.framework_name)}</div>
+                <div class="{status_css}">{status_text}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    result_metrics(result)
+
+    b = result.budget
+
+    st.markdown("##### Quality-Gated Efficiency")
+    cols = st.columns(4)
+    with cols[0]:
+        metric_card(
+            "Quality gate",
+            "PASS" if b.quality_gate_passed else "FAIL",
+            f"{b.quality_checks_passed}/{b.quality_checks_total} required checks.",
+        )
+    with cols[1]:
+        metric_card(
+            "Answer words",
+            str(b.substantive_word_count),
+            "Maximum 180, excluding Sources.",
+        )
+    with cols[2]:
+        metric_card(
+            "Estimated model cost",
+            (
+                f"${b.estimated_model_cost_usd:.6f}"
+                if b.pricing_available
+                else "N/A"
+            ),
+            "Competitor model tokens only; evaluator excluded.",
+        )
+    with cols[3]:
+        metric_card(
+            "LLM calls",
+            str(result.llm_requests),
+            "Competitor model requests only.",
+        )
+
+    if result.status == "failed":
+        st.error(result.error or "The run failed.")
+        return
+
+    st.markdown("##### Final answer")
+    st.markdown(result.answer)
+
+    with st.expander("Behind the Scenes — efficiency trace"):
+        for event in result.trace:
+            if event.status in {"passed", "success"}:
+                css, symbol = "trace-dot-pass", "●"
+            elif event.status == "failed":
+                css, symbol = "trace-dot-fail", "●"
+            else:
+                css, symbol = "trace-dot-warn", "●"
+
+            st.markdown(
+                f"""
+                <div class="trace-item">
+                    <div class="{css}">{symbol}</div>
+                    <div class="trace-stage">{html.escape(event.stage)}</div>
+                    <div class="trace-detail">{html.escape(event.detail)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with st.expander("Budget + Evidence Evaluation"):
+        st.markdown("**Quality gate**")
+        _check_row("Correct GO / NO-GO decision", b.correct_decision)
+        _check_row("Primary payment-timeout risk included", b.primary_risk_present)
+        _check_row("Rollback condition included", b.rollback_condition_present)
+        _check_row("Required next action included", b.next_action_present)
+        _check_row("14:00 UTC deadline included", b.deadline_present)
+        _check_row("Within 180-word substantive budget", b.within_word_budget)
+
+        det = result.deterministic_eval
+        st.markdown("---")
+        st.markdown("**Citation / answer checks**")
+        _check_row("Meaningful answer returned", det.answer_present)
+        _check_row("Evidence packet used", det.research_accessed)
+        _check_row("Numbered citation marker present", det.citation_marker_present)
+        _check_row("Citation numbers map to evidence", det.citation_numbers_valid)
+        _check_row("Every cited evidence URL is listed", det.cited_urls_listed)
+
+        sem = result.semantic_eval
+        st.markdown("---")
+        st.markdown("**Semantic evidence evaluator**")
+        if sem.status == "not_run":
+            st.caption("Semantic evaluation was not run.")
+        elif sem.status == "failed":
+            st.error(f"Evaluator failed: {sem.error}")
+        else:
+            support = sem.evidence_support.upper()
+            support_css = (
+                "eval-pass" if sem.evidence_support == "supported"
+                else "eval-partial" if sem.evidence_support == "partial"
+                else "eval-fail"
+            )
+            st.markdown(
+                f'<div class="eval-row"><div>Evidence support</div>'
+                f'<div class="{support_css}">{html.escape(support)}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+            for requirement in sem.requirements:
+                status = requirement.status.lower()
+                css = (
+                    "eval-pass" if status == "met"
+                    else "eval-partial" if status == "partial"
+                    else "eval-fail"
+                )
+                st.markdown(
+                    f"""
+                    <div class="eval-row">
+                        <div>
+                            <strong>{html.escape(requirement.requirement)}</strong><br>
+                            <span style="color:#667085">{html.escape(requirement.note)}</span>
+                        </div>
+                        <div class="{css}">{html.escape(status.upper())}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            if sem.summary:
+                st.info(sem.summary)
+
+            st.caption(
+                f"Evaluator overhead (not counted in competitor metrics): "
+                f"{sem.judge_requests} model call • "
+                f"{sem.judge_input_tokens + sem.judge_output_tokens:,} tokens • "
+                f"{sem.judge_model}"
+            )
+
+    with st.expander(f"Controlled evidence packet ({len(result.evidence)} items)"):
+        for item in result.evidence:
+            st.markdown(
+                f"**[{item.position}] {item.title}**  \n"
+                f"{item.url}  \n"
+                f"{item.snippet}"
+            )

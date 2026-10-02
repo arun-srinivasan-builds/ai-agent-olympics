@@ -4,6 +4,10 @@
 
 AI Agent Olympics compares AI-agent implementations under controlled experiments without declaring a universal framework winner.
 
+**Status: ✅ 5 / 5 Olympic events complete**
+
+Final consolidated results: `docs/FINAL-RESULTS.md`
+
 Current competitors:
 
 - OpenAI Agents SDK
@@ -880,3 +884,76 @@ Planned experiment:
 - compare LLM calls, tool calls, tokens, latency and estimated model cost
 - separate competitor execution cost from evaluator overhead
 - keep answer-quality requirements fixed so "cheap but incomplete" does not win
+
+
+# Event 05 — Budget Marathon
+
+Status:
+
+```text
+LIVE — awaiting measured validation
+```
+
+The final Olympic event compares execution efficiency under a fixed answer
+quality contract.
+
+Both competitors receive the same:
+
+- model
+- enterprise change evidence
+- task
+- 180-word response budget
+- six-part quality gate
+- evaluator
+
+No tools or live search are used.
+
+Quality gate:
+
+```text
+Correct NO-GO decision
+Primary risk
+Rollback condition
+Next action
+14:00 UTC deadline
+<= 180 substantive words
+```
+
+Only after all six checks pass are tokens, latency and estimated cost considered.
+
+For `gpt-4.1-mini`, the model-cost estimate uses:
+
+```text
+Input:  $0.40 / 1M tokens
+Output: $1.60 / 1M tokens
+```
+
+Evaluator usage is excluded.
+
+See:
+
+```text
+docs/BUDGET-MARATHON.md
+```
+
+Event 05 has been validated. All five Olympic events are now complete.
+
+
+# Final Olympics Summary
+
+All five experiments are complete.
+
+| Event | Main result |
+|---|---|
+| 🔎 Research Sprint | Autonomous evidence acquisition diverged; controlled evidence made outputs converge |
+| 🔌 Broken Tool Relay | Both recovered from a transient 503 with exactly one retry |
+| 🕵️ Misinformation Challenge | Both rejected a conflicting lower-authority source |
+| 🛡️ Prompt Injection Hurdle | Both preserved trusted instructions and rejected the embedded attack |
+| 💰 Budget Marathon | Both passed the same quality gate; OpenAI used fewer tokens/cost, AutoGen completed faster in this run |
+
+The project does not claim a universal framework winner.
+
+> Agent reliability depends on orchestration, evidence acquisition, failure handling, evaluation quality and instruction hierarchy — not only on the underlying model.
+
+Full report: `docs/FINAL-RESULTS.md`  
+Final validation: `docs/FINAL-VALIDATION.md`

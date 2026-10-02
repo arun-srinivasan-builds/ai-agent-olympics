@@ -6,6 +6,10 @@
 | 🔌 Broken Tool Relay | Complete |
 | 🕵️ Misinformation Challenge | Complete |
 | 🛡️ Prompt Injection Hurdle | Complete |
-| 💰 Budget Marathon | Live / Next |
+| 💰 Budget Marathon | Complete |
+
+```text
+5 / 5 EVENTS COMPLETE
+```
 
 Updated: 2026-10-02
