@@ -539,3 +539,109 @@ Then measure:
 - extra tool calls
 - extra tokens
 - recovery time
+
+
+# Event 02 — Broken Tool Relay
+
+Status:
+
+```text
+COMPLETE — validated live result
+```
+
+Scenario:
+
+```text
+Controller shared search
+        |
+Frozen evidence packet
+        |
+   +----+----+
+   |         |
+OpenAI    AutoGen
+   |         |
+Tool call #1 -> simulated HTTP 503
+   |         |
+Retry?
+   |         |
+Tool call #2 -> frozen evidence
+   |         |
+Recovery + final answer
+```
+
+The event measures:
+
+- failure detection
+- retry attempt
+- successful recovery
+- unnecessary extra retries
+- LLM calls
+- tool calls
+- tokens
+- duration
+- evidence-grounded final answer
+
+The minimum clean recovery path is exactly **2 tool calls**.
+
+See:
+
+```text
+docs/BROKEN-TOOL-RELAY.md
+```
+
+Event 02 has been validated and can now be committed.
+
+
+
+# Broken Tool Relay — Validated Findings
+
+Event 02 is complete.
+
+Both competitors experienced the exact same controlled transient failure:
+
+```text
+Tool call #1 -> simulated HTTP 503
+Tool call #2 -> frozen evidence returned
+```
+
+Both recovered using the minimum clean path.
+
+| Metric | OpenAI Agents SDK | Microsoft AutoGen |
+|---|---:|---:|
+| Recovered | yes | yes |
+| Tool calls | 2 | 2 |
+| Extra retries | 0 | 0 |
+| LLM requests | 3 | 3 |
+| Total tokens | 1,454 | 1,415 |
+| Duration | 7.274 s | 3.596 s |
+| Deterministic checks | 5/5 | 5/5 |
+| Evidence support | supported | supported |
+
+## Main Learning
+
+> Both agent implementations detected the transient failure, retried exactly
+> once, recovered valid evidence, and completed without unnecessary additional
+> tool calls.
+
+The recovery behavior was effectively identical in this controlled event.
+
+Measured execution time and token usage differed, but one run is not sufficient
+for a universal framework-level efficiency conclusion.
+
+Full findings:
+
+```text
+docs/BROKEN-TOOL-RELAY-FINDINGS.md
+```
+
+
+
+# Next Event — 🕵️ Misinformation Challenge
+
+Planned experiment:
+
+- controller supplies a controlled evidence set
+- one item contains a deliberate factual conflict
+- both agents must identify the conflict instead of blindly trusting all sources
+- measure conflict detection, uncertainty handling, evidence selection and final
+  answer support

@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 
 from src.agents.autogen_runner import run_autogen_research
+from src.agents.autogen_broken_tool_runner import run_autogen_broken_tool_relay
 from src.agents.openai_runner import run_openai_research
+from src.agents.openai_broken_tool_runner import run_openai_broken_tool_relay
 from src.core.guardrails import validate_research_prompt
 from src.core.models import ComparisonResult
 from src.core.semantic_eval import run_semantic_evaluation
@@ -70,6 +72,64 @@ async def run_research_sprint(
         prompt=clean_prompt,
         model=settings.model,
         mode=mode,
+        openai_agents=openai_result,
+        autogen=autogen_result,
+        created_at_utc=datetime.now(timezone.utc).isoformat(),
+        shared_external_search_calls=shared_external_search_calls,
+        shared_evidence=shared_evidence,
+        semantic_eval_enabled=semantic_eval_enabled,
+    )
+
+    _persist_comparison(comparison)
+    return comparison
+
+
+
+async def run_broken_tool_relay(
+    prompt: str,
+    settings: Settings,
+    shared_search_query: str,
+    semantic_eval_enabled: bool = True,
+) -> ComparisonResult:
+    clean_prompt = validate_research_prompt(prompt)
+
+    shared_evidence, shared_external_search_calls = await prefetch_shared_evidence(
+        question=shared_search_query,
+        api_key=settings.serper_api_key,
+    )
+
+    openai_result = await run_openai_broken_tool_relay(
+        clean_prompt,
+        settings,
+        shared_evidence,
+    )
+    autogen_result = await run_autogen_broken_tool_relay(
+        clean_prompt,
+        settings,
+        shared_evidence,
+    )
+
+    if semantic_eval_enabled:
+        if openai_result.status == "success" and openai_result.recovery.recovered:
+            openai_result.semantic_eval = await run_semantic_evaluation(
+                question=clean_prompt,
+                answer=openai_result.answer,
+                evidence=openai_result.evidence,
+                settings=settings,
+            )
+        if autogen_result.status == "success" and autogen_result.recovery.recovered:
+            autogen_result.semantic_eval = await run_semantic_evaluation(
+                question=clean_prompt,
+                answer=autogen_result.answer,
+                evidence=autogen_result.evidence,
+                settings=settings,
+            )
+
+    comparison = ComparisonResult(
+        event_id="broken_tool_relay",
+        prompt=clean_prompt,
+        model=settings.model,
+        mode="fault_injection",
         openai_agents=openai_result,
         autogen=autogen_result,
         created_at_utc=datetime.now(timezone.utc).isoformat(),

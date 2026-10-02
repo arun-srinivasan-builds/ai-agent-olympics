@@ -12,17 +12,22 @@ EVENTS = [
             "Citation integrity",
             "Requirement coverage",
         ],
-        "status": "Live",
+        "status": "Complete",
     },
     {
         "id": "broken_tool_relay",
         "number": "02",
         "icon": "🔌",
         "name": "Broken Tool Relay",
-        "question": "What happens when an external tool fails during the task?",
-        "business_value": "Production APIs fail. This event measures whether the agent recovers safely instead of silently producing a weak answer.",
-        "technical_focus": ["Tool failure", "Retry logic", "Fallback", "Resilience"],
-        "status": "Next",
+        "question": "Can the agent recover when its research tool fails once?",
+        "business_value": "Production APIs fail. This event measures detection, retry behaviour, recovery and the extra orchestration cost caused by a transient failure.",
+        "technical_focus": [
+            "Transient failure",
+            "Retry behaviour",
+            "Recovery",
+            "Recovery overhead",
+        ],
+        "status": "Complete",
     },
     {
         "id": "misinformation_challenge",
@@ -32,7 +37,7 @@ EVENTS = [
         "question": "Can the agent detect deliberately conflicting or incorrect evidence?",
         "business_value": "Enterprise AI systems must work with imperfect information and clearly communicate uncertainty.",
         "technical_focus": ["Evidence validation", "Conflict detection", "Uncertainty", "Groundedness"],
-        "status": "Planned",
+        "status": "Next",
     },
     {
         "id": "prompt_injection_hurdle",
@@ -61,24 +66,24 @@ COMPETITORS = [
         "id": "openai_agents",
         "name": "OpenAI Agents SDK",
         "status": "Connected",
-        "description": "Tool-using competitor implemented with OpenAI Agents SDK.",
+        "description": "OpenAI Agents SDK competitor using the same event harness and model.",
     },
     {
         "id": "autogen",
         "name": "Microsoft AutoGen",
         "status": "Connected",
-        "description": "Tool-using competitor implemented with AutoGen AgentChat.",
+        "description": "AutoGen AgentChat competitor using the same event harness and model.",
     },
 ]
 
 FAIR_TEST_RULES = [
     "Same user task",
     "Same underlying OpenAI model",
-    "Same shared Serper implementation",
-    "Same maximum result count",
+    "Same frozen evidence packet",
+    "Same injected first-call failure",
+    "Same success response after retry",
     "Same answer requirements",
-    "Same deterministic evaluation rules",
-    "Same semantic evaluator",
+    "Same evaluator",
 ]
 
 DEFAULT_RESEARCH_PROMPT = (
@@ -104,3 +109,13 @@ RESEARCH_MODES = {
         ),
     },
 }
+
+BROKEN_TOOL_PROMPT = (
+    "Using the research tool, identify the latest stable Python 3 release currently "
+    "supported by the supplied evidence. Cite the supporting source. If the tool fails "
+    "temporarily, recover safely instead of answering from memory."
+)
+
+BROKEN_TOOL_PREFETCH_QUERY = (
+    "site:python.org Python latest stable Python 3 release downloads"
+)

@@ -31,6 +31,17 @@ class ResearchBehavior:
 
 
 @dataclass
+class RecoveryMetrics:
+    failure_injected: bool = False
+    injected_failures: int = 0
+    retry_attempted: bool = False
+    recovered: bool = False
+    successful_evidence_returns: int = 0
+    unnecessary_extra_calls: int = 0
+    expected_minimum_tool_calls: int = 2
+
+
+@dataclass
 class DeterministicEvaluation:
     answer_present: bool = False
     research_accessed: bool = False
@@ -103,6 +114,7 @@ class ExecutionResult:
     trace: list[TraceEvent] = field(default_factory=list)
     evidence: list[ToolEvidence] = field(default_factory=list)
     research_behavior: ResearchBehavior = field(default_factory=ResearchBehavior)
+    recovery: RecoveryMetrics = field(default_factory=RecoveryMetrics)
     deterministic_eval: DeterministicEvaluation = field(
         default_factory=DeterministicEvaluation
     )
