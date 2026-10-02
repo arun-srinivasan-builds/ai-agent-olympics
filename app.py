@@ -1,14 +1,48 @@
+import asyncio
+
 import streamlit as st
 
-from config.events import COMPETITORS, EVENTS, FAIR_TEST_RULES
+from config.events import (
+    COMPETITORS,
+    DEFAULT_RESEARCH_PROMPT,
+    EVENTS,
+    FAIR_TEST_RULES,
+    RESEARCH_MODES,
+)
+from src.core.experiment_runner import run_research_sprint
+from src.core.guardrails import InputGuardrailError
+from src.core.settings import get_settings
 from src.ui import (
     competitor_card,
-    empty_result,
+    config_status,
     event_card,
     inject_global_css,
     metric_card,
+    render_result,
     section_title,
 )
+
+
+def run_async(coro):
+    """
+    Execute async work on one persistent event loop for this Streamlit session.
+    This avoids closing the SDK transport loop between button-click reruns.
+    """
+    loop = st.session_state.get("_async_loop")
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        st.session_state["_async_loop"] = loop
+
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
+def as_text(value):
+    """Return type-stable table values for Streamlit/PyArrow."""
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
+
 
 st.set_page_config(
     page_title="AI Agent Olympics",
@@ -18,9 +52,10 @@ st.set_page_config(
 )
 
 inject_global_css()
+settings = get_settings()
 
-if "selected_event" not in st.session_state:
-    st.session_state.selected_event = EVENTS[0]["id"]
+if "comparison" not in st.session_state:
+    st.session_state.comparison = None
 
 st.markdown(
     """
@@ -32,7 +67,7 @@ st.markdown(
                 <div class="brand-subtitle">Enterprise Agent Reliability & Efficiency Lab</div>
             </div>
         </div>
-        <div class="live-badge"><span class="live-dot"></span> LAB READY</div>
+        <div class="lab-badge"><span class="lab-dot"></span> RESEARCH SPRINT 2.1</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -50,42 +85,52 @@ if page == "Overview":
         """
         <div class="hero">
             <div class="eyebrow">Controlled AI Agent Evaluation</div>
-            <h1>What happens when AI agents face the problems demos usually hide?</h1>
+            <h1>Same question. Two research strategies. Evidence you can inspect.</h1>
             <p>
-                Two agent architectures will face the same tasks, tools, evidence and evaluation rules.
-                The goal is not to crown a universal winner. It is to understand how each architecture
-                behaves under realistic operating pressure.
+                Research Sprint now separates search behaviour from evidence interpretation.
+                Run agents autonomously, or freeze one evidence packet and make both interpret
+                exactly the same information.
             </p>
             <div class="hero-tags">
-                <span class="hero-tag">Same Task</span>
-                <span class="hero-tag">Same Model</span>
-                <span class="hero-tag">Equivalent Tools</span>
-                <span class="hero-tag">Measured Recovery</span>
-                <span class="hero-tag">Guardrails + Evals</span>
-                <span class="hero-tag">API Efficiency</span>
+                <span class="hero-tag">Autonomous Research</span>
+                <span class="hero-tag">Controlled Evidence</span>
+                <span class="hero-tag">Citation Integrity</span>
+                <span class="hero-tag">Requirement Coverage</span>
+                <span class="hero-tag">Real Usage Metrics</span>
+                <span class="hero-tag">Evaluation Cost Separated</span>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    metric_cols = st.columns(4)
-    with metric_cols[0]:
-        metric_card("Events configured", "5 / 5", "Experiment definitions are ready.")
-    with metric_cols[1]:
-        metric_card("Events executed", "0 / 5", "No live benchmark has been run yet.")
-    with metric_cols[2]:
-        metric_card("Agent runs", "0", "Framework integration begins in Milestone 2.")
-    with metric_cols[3]:
-        metric_card("Results status", "Not Run", "No synthetic scores are displayed.")
+    comparison = st.session_state.comparison
+    successful_runs = 0
+    if comparison:
+        successful_runs = sum(
+            result.status == "success"
+            for result in [comparison.openai_agents, comparison.autogen]
+        )
+
+    cols = st.columns(4)
+    with cols[0]:
+        metric_card("Events configured", "5 / 5", "Five Olympic events defined.")
+    with cols[1]:
+        metric_card("Research modes", "2", "Autonomous + Controlled Evidence.")
+    with cols[2]:
+        metric_card("Latest agent runs", str(successful_runs), "Successful current-session runs.")
+    with cols[3]:
+        metric_card("Evaluation layer", "2-stage", "Deterministic + semantic evidence checks.")
+
+    config_status(settings.ready, settings.model, settings.eval_model)
 
     section_title(
         "Competitors",
-        "Both implementations will be evaluated through the same event harness.",
+        "Both use the same configured model; framework orchestration remains native.",
     )
-    comp_cols = st.columns(2)
-    for index, competitor in enumerate(COMPETITORS):
-        with comp_cols[index]:
+    cols = st.columns(2)
+    for i, competitor in enumerate(COMPETITORS):
+        with cols[i]:
             competitor_card(
                 competitor["name"],
                 competitor["status"],
@@ -93,30 +138,39 @@ if page == "Overview":
             )
 
     section_title(
-        "Olympic Events",
-        "Five tests covering usefulness, resilience, safety, evidence quality and efficiency.",
+        "What changed after our first live run?",
+        "The first experiment showed that a format-level PASS can still hide answer-quality problems.",
     )
+    st.markdown(
+        """
+        <div class="quality-callout">
+            <strong>Simple eval:</strong> Did it answer? Did it search? Did it cite?<br><br>
+            <strong>Evidence-aware eval:</strong> Do citations map correctly? Are cited URLs actually
+            listed? Does the evidence support the claims? Was every user requirement answered?
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    section_title("Olympic Events", "Research Sprint is live with evidence-aware evaluation.")
     for event in EVENTS:
         event_card(event)
 
-    section_title(
-        "Fair Test Protocol",
-        "Controls designed to reduce accidental bias between the two implementations.",
-    )
+    section_title("Fair Test Protocol", "Controls defined before interpreting results.")
     left, right = st.columns([1.05, 1])
     with left:
-        rules_html = "".join(
+        rules = "".join(
             f'<div class="rule-item"><span class="rule-check">✓</span>{rule}</div>'
             for rule in FAIR_TEST_RULES
         )
-        st.markdown(f'<div class="rule-card">{rules_html}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="rule-card">{rules}</div>', unsafe_allow_html=True)
     with right:
         st.markdown(
             """
             <div class="method-note">
-                <strong>Important:</strong> this project reports measured behavior from these controlled
-                experiments. It will not claim that one framework is universally better than another.
-                Differences in orchestration, retries, handoffs and tool usage will be shown as evidence.
+                <strong>Autonomous mode</strong> intentionally allows different evidence because
+                search strategy is part of the agent behaviour.<br><br>
+                <strong>Controlled mode</strong> removes that variable by sharing one evidence packet.
             </div>
             """,
             unsafe_allow_html=True,
@@ -124,139 +178,296 @@ if page == "Overview":
 
 elif page == "Live Arena":
     section_title(
-        "Live Arena",
-        "This view will stream one controlled experiment side-by-side once the agent runners are connected.",
+        "Live Arena — Research Sprint",
+        "Choose whether you want to test research strategy or evidence interpretation.",
     )
+    config_status(settings.ready, settings.model, settings.eval_model)
 
-    event_lookup = {event["id"]: event for event in EVENTS}
-    selected_name = st.selectbox(
-        "Choose an event",
-        options=[event["id"] for event in EVENTS],
-        format_func=lambda event_id: f'{event_lookup[event_id]["icon"]}  {event_lookup[event_id]["name"]}',
+    mode_label = st.radio(
+        "Research mode",
+        options=["autonomous", "controlled"],
+        format_func=lambda key: RESEARCH_MODES[key]["label"],
+        horizontal=True,
     )
-    st.session_state.selected_event = selected_name
-    selected = event_lookup[selected_name]
+    mode = mode_label
 
     st.markdown(
         f"""
-        <div class="event-card">
-            <div class="event-title-row">
-                <span class="event-icon">{selected["icon"]}</span>
-                <div>
-                    <div class="event-number">SELECTED EVENT {selected["number"]}</div>
-                    <div class="event-name">{selected["name"]}</div>
-                    <div class="event-question">{selected["question"]}</div>
-                </div>
-            </div>
-            <div class="event-business"><strong>Why it matters:</strong> {selected["business_value"]}</div>
+        <div class="mode-card">
+            <strong>{RESEARCH_MODES[mode]["label"]}</strong><br>
+            {RESEARCH_MODES[mode]["description"]}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    arena_cols = st.columns(2)
-    with arena_cols[0]:
-        st.markdown("### OpenAI Agents SDK")
-        empty_result(
-            "Waiting for agent runner",
-            "Execution trace, tool activity, guardrails and metrics will appear here.",
-        )
-    with arena_cols[1]:
-        st.markdown("### Microsoft AutoGen")
-        empty_result(
-            "Waiting for agent runner",
-            "Execution trace, tool activity, guardrails and metrics will appear here.",
+    prompt = st.text_area(
+        "Research question",
+        value=DEFAULT_RESEARCH_PROMPT,
+        height=110,
+        help="The exact same user question is passed to both competitors.",
+    )
+
+    semantic_eval_enabled = st.checkbox(
+        "Run semantic evidence evaluator (adds 2 shared judge model calls)",
+        value=True,
+        help=(
+            "Evaluator usage is recorded separately and is never added to either "
+            "competitor's token/call metrics."
+        ),
+    )
+
+    run_clicked = st.button(
+        "🏁 Run Research Sprint",
+        type="primary",
+        disabled=not settings.ready,
+    )
+
+    if run_clicked:
+        try:
+            with st.status("Running controlled comparison...", expanded=True) as status:
+                if mode == "controlled":
+                    st.write("0/3 — Fetching one shared evidence packet")
+                st.write("1/3 — Running OpenAI Agents SDK")
+                st.write("2/3 — Running Microsoft AutoGen")
+                if semantic_eval_enabled:
+                    st.write("3/3 — Applying the same evidence evaluator to both answers")
+
+                comparison = run_async(
+                    run_research_sprint(
+                        prompt=prompt,
+                        settings=settings,
+                        mode=mode,
+                        semantic_eval_enabled=semantic_eval_enabled,
+                    )
+                )
+                st.session_state.comparison = comparison
+                status.update(
+                    label="Research Sprint completed",
+                    state="complete",
+                    expanded=False,
+                )
+        except InputGuardrailError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Experiment controller failed: {type(exc).__name__}: {exc}")
+
+    comparison = st.session_state.comparison
+
+    if comparison:
+        mode_name = RESEARCH_MODES[comparison.mode]["label"]
+        st.caption(
+            f"Mode: {mode_name} • Model: {comparison.model} • "
+            f"Evidence run: {comparison.created_at_utc}"
         )
 
-    st.info(
-        "Milestone 1 intentionally does not simulate results. "
-        "The Run Event control will be activated when both real framework runners are connected."
-    )
+        if comparison.mode == "controlled":
+            st.success(
+                f"Controlled Evidence active: one shared external search produced "
+                f"{len(comparison.shared_evidence)} evidence items. "
+                "Both competitors received this exact packet."
+            )
+
+        tabs = st.tabs(["OpenAI Agents SDK", "Microsoft AutoGen"])
+        with tabs[0]:
+            render_result(comparison.openai_agents)
+        with tabs[1]:
+            render_result(comparison.autogen)
+
+        section_title(
+            "Side-by-Side Measured Metrics",
+            "Descriptive measurements only — no universal framework winner is declared.",
+        )
+
+        oa = comparison.openai_agents
+        ag = comparison.autogen
+        st.table(
+            {
+                "Metric": [
+                    "Run status",
+                    "LLM requests",
+                    "Evidence tool calls",
+                    "External searches",
+                    "Input tokens",
+                    "Output tokens",
+                    "Total tokens",
+                    "Duration (seconds)",
+                    "Deterministic checks",
+                    "Evidence support",
+                    "Incomplete requirements",
+                ],
+                "OpenAI Agents SDK": [
+                    as_text(oa.status),
+                    as_text(oa.llm_requests),
+                    as_text(oa.tool_calls),
+                    as_text(oa.research_behavior.external_search_calls),
+                    as_text(oa.input_tokens),
+                    as_text(oa.output_tokens),
+                    as_text(oa.total_tokens),
+                    as_text(oa.duration_seconds),
+                    f"{oa.deterministic_eval.passed_checks}/{oa.deterministic_eval.total_checks}",
+                    as_text(oa.semantic_eval.evidence_support),
+                    as_text(len(oa.semantic_eval.incomplete_requirements)),
+                ],
+                "Microsoft AutoGen": [
+                    as_text(ag.status),
+                    as_text(ag.llm_requests),
+                    as_text(ag.tool_calls),
+                    as_text(ag.research_behavior.external_search_calls),
+                    as_text(ag.input_tokens),
+                    as_text(ag.output_tokens),
+                    as_text(ag.total_tokens),
+                    as_text(ag.duration_seconds),
+                    f"{ag.deterministic_eval.passed_checks}/{ag.deterministic_eval.total_checks}",
+                    as_text(ag.semantic_eval.evidence_support),
+                    as_text(len(ag.semantic_eval.incomplete_requirements)),
+                ],
+            }
+        )
+
+        if semantic_eval_enabled:
+            eval_calls = (
+                oa.semantic_eval.judge_requests
+                + ag.semantic_eval.judge_requests
+            )
+            eval_tokens = (
+                oa.semantic_eval.judge_input_tokens
+                + oa.semantic_eval.judge_output_tokens
+                + ag.semantic_eval.judge_input_tokens
+                + ag.semantic_eval.judge_output_tokens
+            )
+            st.caption(
+                f"Evaluation overhead kept separate: {eval_calls} judge model calls, "
+                f"{eval_tokens:,} judge tokens."
+            )
+    else:
+        st.info("No Research Sprint has been run in this browser session yet.")
 
 elif page == "Events":
     section_title(
         "Event Catalogue",
-        "Each event has a plain-English purpose and a measurable engineering objective.",
+        "Research Sprint now has two experimental modes and an evidence-aware evaluator.",
     )
-
     for event in EVENTS:
         event_card(event)
-        with st.expander(f'What will we measure in {event["name"]}?'):
-            if event["id"] == "research_sprint":
-                st.write(
-                    "Task completion, source validation, citation correctness, groundedness, "
-                    "tool calls, LLM calls and estimated cost."
-                )
-            elif event["id"] == "broken_tool_relay":
-                st.write(
-                    "Failure detection, recovery attempt count, fallback selection, successful completion, "
-                    "extra tool/LLM calls and cost introduced by recovery."
-                )
-            elif event["id"] == "misinformation_challenge":
-                st.write(
-                    "Conflict detection, evidence comparison, uncertainty handling, unsupported claims, "
-                    "groundedness and final-answer quality."
-                )
-            elif event["id"] == "prompt_injection_hurdle":
-                st.write(
-                    "Injection detection, instruction integrity, unsafe tool behavior, output validation "
-                    "and whether untrusted content changes the intended task."
-                )
-            elif event["id"] == "budget_marathon":
-                st.write(
-                    "Task completion within a controlled budget, LLM calls, tool calls, token usage, "
-                    "estimated cost and duplicate/unnecessary work."
-                )
 
 elif page == "Results":
     section_title(
         "Experiment Results",
-        "Only evidence generated by real event executions will be shown here.",
+        "Measured agent behaviour and answer-quality evidence from the latest session run.",
     )
 
-    result_cols = st.columns(4)
-    with result_cols[0]:
-        metric_card("Completed comparisons", "0", "Waiting for live execution.")
-    with result_cols[1]:
-        metric_card("Guardrail checks", "0", "No benchmark data yet.")
-    with result_cols[2]:
-        metric_card("Evaluation records", "0", "No benchmark data yet.")
-    with result_cols[3]:
-        metric_card("Measured cost", "$0.00", "No API calls have been made.")
+    comparison = st.session_state.comparison
+    if not comparison:
+        st.info("Run Research Sprint from Live Arena first.")
+    else:
+        oa = comparison.openai_agents
+        ag = comparison.autogen
 
-    empty_result(
-        "No experiment results yet",
-        "After Milestone 2, each event will produce framework-specific traces, metrics and evaluation evidence.",
-    )
+        cols = st.columns(4)
+        with cols[0]:
+            metric_card(
+                "Mode",
+                "Controlled" if comparison.mode == "controlled" else "Autonomous",
+                "What variable this run isolates.",
+            )
+        with cols[1]:
+            metric_card(
+                "Competitor LLM calls",
+                str(oa.llm_requests + ag.llm_requests),
+                "Does not include evaluator calls.",
+            )
+        with cols[2]:
+            competitor_searches = (
+                oa.research_behavior.external_search_calls
+                + ag.research_behavior.external_search_calls
+            )
+            total_searches = competitor_searches + comparison.shared_external_search_calls
+            metric_card(
+                "External searches",
+                str(total_searches),
+                "Includes shared prefetch when controlled.",
+            )
+        with cols[3]:
+            metric_card(
+                "Competitor tokens",
+                f"{oa.total_tokens + ag.total_tokens:,}",
+                "Evaluator tokens excluded.",
+            )
+
+        st.markdown(
+            """
+            <div class="quality-callout">
+                <strong>Why the old 3/3 could mislead:</strong><br>
+                Format-level checks can confirm that an answer exists, a tool was used and
+                citation syntax is present. They cannot by themselves prove that the cited
+                evidence supports the claim or that every requested detail was answered.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("### Evidence quality")
+        st.table(
+            {
+                "Check": [
+                    "Citation numbers valid",
+                    "Cited URLs listed",
+                    "Evidence support",
+                    "Incomplete requirements",
+                    "Unsupported claims",
+                    "Contradictions",
+                ],
+                "OpenAI Agents SDK": [
+                    as_text(oa.deterministic_eval.citation_numbers_valid),
+                    as_text(oa.deterministic_eval.cited_urls_listed),
+                    as_text(oa.semantic_eval.evidence_support),
+                    as_text(len(oa.semantic_eval.incomplete_requirements)),
+                    as_text(len(oa.semantic_eval.unsupported_claims)),
+                    as_text(len(oa.semantic_eval.contradictions)),
+                ],
+                "Microsoft AutoGen": [
+                    as_text(ag.deterministic_eval.citation_numbers_valid),
+                    as_text(ag.deterministic_eval.cited_urls_listed),
+                    as_text(ag.semantic_eval.evidence_support),
+                    as_text(len(ag.semantic_eval.incomplete_requirements)),
+                    as_text(len(ag.semantic_eval.unsupported_claims)),
+                    as_text(len(ag.semantic_eval.contradictions)),
+                ],
+            }
+        )
 
 elif page == "Learnings":
     section_title(
         "Learning Log",
-        "Engineering conclusions will be added only after a measured experiment supports them.",
+        "What the experiment design itself has taught us so far.",
     )
 
     st.markdown(
         """
         <div class="rule-card">
             <div class="rule-item"><span class="rule-check">✓</span>
-                Experiment framing completed: compare behavior, not marketing claims.
+                Same tool does not automatically mean same evidence.
             </div>
             <div class="rule-item"><span class="rule-check">✓</span>
-                Five event categories defined: research, resilience, misinformation, security and efficiency.
+                An agent can search successfully and still stop before every requirement is resolved.
             </div>
             <div class="rule-item"><span class="rule-check">✓</span>
-                Dashboard avoids fake benchmark scores before real execution.
+                Citation syntax is not the same thing as citation integrity.
             </div>
             <div class="rule-item"><span class="rule-check">✓</span>
-                Fair-test protocol defined before framework implementation.
+                Controlled Evidence isolates interpretation; Autonomous Research tests the complete strategy.
+            </div>
+            <div class="rule-item"><span class="rule-check">✓</span>
+                Evaluation overhead must be measured separately from competitor efficiency.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown("### Next engineering milestone")
+    st.markdown("### Next milestone")
     st.write(
-        "Connect the first real competitors, establish a common result schema, "
-        "and run a baseline task through both frameworks."
+        "Broken Tool Relay: inject a controlled research-tool failure, measure detection, "
+        "retry/fallback behaviour and the extra model/tool cost of recovery."
     )

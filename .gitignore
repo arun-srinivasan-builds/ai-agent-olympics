@@ -7,12 +7,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Local benchmark outputs
 outputs/
 logs/
 *.log
 
-# Test/cache artifacts
 .pytest_cache/
 .coverage
 htmlcov/

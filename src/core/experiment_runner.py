@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+
+from src.agents.autogen_runner import run_autogen_research
+from src.agents.openai_runner import run_openai_research
+from src.core.guardrails import validate_research_prompt
+from src.core.models import ComparisonResult
+from src.core.semantic_eval import run_semantic_evaluation
+from src.core.settings import Settings
+from src.tools.research_tool import prefetch_shared_evidence
+
+
+async def run_research_sprint(
+    prompt: str,
+    settings: Settings,
+    mode: str = "autonomous",
+    semantic_eval_enabled: bool = True,
+) -> ComparisonResult:
+    clean_prompt = validate_research_prompt(prompt)
+
+    if mode not in {"autonomous", "controlled"}:
+        raise ValueError("Research mode must be 'autonomous' or 'controlled'.")
+
+    shared_evidence = []
+    shared_external_search_calls = 0
+
+    if mode == "controlled":
+        (
+            shared_evidence,
+            shared_external_search_calls,
+        ) = await prefetch_shared_evidence(
+            question=clean_prompt,
+            api_key=settings.serper_api_key,
+        )
+
+    openai_result = await run_openai_research(
+        clean_prompt,
+        settings,
+        mode,
+        shared_evidence,
+    )
+    autogen_result = await run_autogen_research(
+        clean_prompt,
+        settings,
+        mode,
+        shared_evidence,
+    )
+
+    if semantic_eval_enabled:
+        if openai_result.status == "success":
+            openai_result.semantic_eval = await run_semantic_evaluation(
+                question=clean_prompt,
+                answer=openai_result.answer,
+                evidence=openai_result.evidence,
+                settings=settings,
+            )
+        if autogen_result.status == "success":
+            autogen_result.semantic_eval = await run_semantic_evaluation(
+                question=clean_prompt,
+                answer=autogen_result.answer,
+                evidence=autogen_result.evidence,
+                settings=settings,
+            )
+
+    comparison = ComparisonResult(
+        event_id="research_sprint",
+        prompt=clean_prompt,
+        model=settings.model,
+        mode=mode,
+        openai_agents=openai_result,
+        autogen=autogen_result,
+        created_at_utc=datetime.now(timezone.utc).isoformat(),
+        shared_external_search_calls=shared_external_search_calls,
+        shared_evidence=shared_evidence,
+        semantic_eval_enabled=semantic_eval_enabled,
+    )
+
+    _persist_comparison(comparison)
+    return comparison
+
+
+def _persist_comparison(comparison: ComparisonResult) -> None:
+    output_dir = Path("outputs") / comparison.event_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = output_dir / f"{comparison.mode}_{timestamp}.json"
+    path.write_text(
+        json.dumps(comparison.to_dict(), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )

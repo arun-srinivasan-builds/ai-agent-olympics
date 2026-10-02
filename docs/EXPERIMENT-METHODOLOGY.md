@@ -1,90 +1,152 @@
-# Experiment Methodology
+# Experiment Methodology — Research Sprint 2.1
 
-## Purpose
+## Lesson From the First Live Run
 
-AI Agent Olympics is a learning experiment.
+A three-check evaluator:
 
-It does not attempt to make a universal claim about any framework.
+- answer exists
+- research tool used
+- citation syntax present
 
-The aim is to observe how different orchestration approaches behave under equivalent controlled conditions.
+was too shallow.
 
-## Core Controls
+An answer can satisfy all three and still:
 
-Each comparison should keep the following aligned where technically feasible:
+- omit a requested detail
+- cite a source list incompletely
+- overstate what evidence establishes
+- confuse preview/scheduled information with a confirmed final state
 
-- user task
-- underlying model
-- model settings
-- tools
-- evidence
-- time/retry boundaries
-- output requirements
-- evaluation rules
+---
 
-Any unavoidable framework-specific difference must be documented.
+# Mode A — Autonomous Research
 
-## Planned Measures
+Purpose:
 
-### Effectiveness
-- task completion
-- answer correctness
-- groundedness
-- evidence quality
-- instruction adherence
+Evaluate the complete agent research loop.
 
-### Reliability
-- tool failure detection
-- retry behavior
-- fallback behavior
-- completion after failure
+Variables intentionally left to the competitor:
+
+- query formulation
+- number of searches
+- follow-up searches
+- stopping decision
+- evidence selected from live search
+
+Interpretation rule:
+
+Different evidence is not automatically unfair here because search strategy is part of the capability being tested.
+
+---
+
+# Mode B — Controlled Evidence
+
+Purpose:
+
+Isolate evidence interpretation.
+
+Controller:
+
+1. performs one search
+2. freezes returned evidence
+3. gives the exact same evidence packet to both competitors
+
+Interpretation rule:
+
+Differences are less attributable to search-result variation.
+
+---
+
+# Deterministic Evaluation
+
+Checks:
+
+1. answer present
+2. evidence tool accessed
+3. citation marker present
+4. citation numbers within captured packet
+5. every cited evidence URL listed in answer
+
+This does not prove factual correctness, but it catches citation-structure failures the original eval missed.
+
+---
+
+# Semantic Evidence Evaluation
+
+A shared evaluator receives:
+
+- user question
+- evidence packet
+- candidate answer
+
+It must not use outside knowledge.
+
+Outputs:
+
+- evidence support
+- requirement coverage
 - unsupported claims
+- contradictions
+- summary
 
-### Safety
-- prompt-injection resistance
-- input guardrail result
-- tool input validation
-- output validation
-- evidence requirement
+This is an LLM-based evaluator and therefore should be treated as another measurement instrument, not absolute truth.
 
-### Efficiency
-- LLM calls
-- tool calls
-- token usage
-- estimated model cost
-- duplicated work
-- recovery overhead
+---
 
-### Observability
-- execution stages
-- handoffs
-- tool usage
-- guardrail status
-- evaluation status
+# Evaluator Bias Limitation
 
-## Result Language
+Using an LLM judge introduces possible evaluator bias.
 
-Allowed:
+Mitigations:
 
-> In this controlled event, Architecture A used fewer model calls.
+- same evaluator model for both competitors
+- identical evaluator instructions
+- evidence packet included explicitly
+- judge usage measured separately
+- raw evaluation findings displayed
+- no universal winner calculated
 
-Allowed:
+Future improvement:
 
-> Architecture B recovered from the injected tool failure after two attempts.
+Run multiple evaluator models or deterministic domain-specific assertions for critical benchmarks.
 
-Avoid:
+---
 
-> Architecture A is the best framework.
+# Live Search Limitation
 
-Avoid:
+Autonomous mode uses live web search, so evidence may change between sequential runs.
 
-> Architecture B is always more reliable.
+Controlled Evidence exists specifically to reduce that variable.
 
-## No Synthetic Scores
+---
 
-The dashboard must not display fabricated performance numbers.
+# Repetition
 
-Before an event is executed, the result state is:
+A single run is illustrative, not statistically conclusive.
 
-`Not Run`
+Later benchmark iterations should repeat an event several times before making claims about consistency.
 
-This rule is part of the credibility of the project.
+
+---
+
+# Controlled Evidence Final Design
+
+Controlled Evidence does not expose a research tool to either competitor.
+
+The controller owns the only external search.
+
+Both competitors receive the same frozen evidence packet directly in their
+input.
+
+Therefore the intended Controlled Evidence measurements are:
+
+```text
+Shared external searches: 1
+OpenAI competitor external searches: 0
+AutoGen competitor external searches: 0
+OpenAI evidence-tool calls: 0
+AutoGen evidence-tool calls: 0
+```
+
+This design avoids meaningless repeated requests for an evidence packet that
+cannot change.

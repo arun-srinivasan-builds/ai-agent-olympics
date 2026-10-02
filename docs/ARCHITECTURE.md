@@ -1,75 +1,123 @@
-# Architecture — AI Agent Olympics
+# Architecture — Milestone 2.1
 
-## Objective
+## New Experiment Separation
 
-Build a framework-neutral experiment harness that can run the same controlled task against different agent orchestration implementations.
+Research Sprint now has two modes.
 
-## High-Level Architecture
+### Autonomous Research
 
 ```text
-                         AI AGENT OLYMPICS
-                                |
-                         Streamlit Dashboard
-                                |
-                        Experiment Controller
-                                |
-                  +-------------+-------------+
-                  |                           |
-          OpenAI Agents Runner          AutoGen Runner
-                  |                           |
-                  +-------------+-------------+
-                                |
-                         Shared Event Harness
-                                |
-             +------------------+------------------+
-             |                  |                  |
-          Tools            Guardrails           Evals
-             |                  |                  |
-             +------------------+------------------+
-                                |
-                         Result Normalizer
-                                |
-                        Evidence / Metrics
-                                |
-                         Dashboard Results
+Question
+   |
+   +--> OpenAI Agent --> its own search queries --> evidence A
+   |
+   +--> AutoGen      --> its own search queries --> evidence B
 ```
 
-## Architecture Principle
+This measures research strategy.
 
-Framework-specific logic stays inside dedicated runner adapters.
+### Controlled Evidence
 
-Everything else should be shared where possible:
+```text
+Question
+   |
+Shared Serper search
+   |
+Frozen evidence packet
+   |
+   +--> OpenAI Agent
+   |
+   +--> AutoGen
+```
 
-- event inputs
-- tool behavior
-- injected failures
-- evidence sets
-- evaluation logic
-- metric schema
-- reporting
+This measures interpretation against the same evidence.
 
-This reduces the risk of accidentally giving one framework a different test.
+---
 
-## Observability Principle
+## Result Contract
 
-The UI may display:
+Every framework still returns a common `ExecutionResult`.
 
-- agent names
-- task status
-- tool invocations
-- handoffs/delegations
-- retries
-- guardrail outcomes
-- evaluation outcomes
-- token/cost metadata
-- timestamps/durations
+Milestone 2.1 adds:
 
-The UI will **not** display hidden chain-of-thought.
+- `mode`
+- `ResearchBehavior`
+- `DeterministicEvaluation`
+- `SemanticEvaluation`
 
-## Milestone 1 Decision
+This keeps framework-specific objects away from the UI.
 
-No agent framework is imported yet.
+---
 
-Reason:
+## Evaluation Separation
 
-The dashboard and event contracts are established before framework-specific implementation so the benchmark does not get designed around one competitor.
+Competitor execution metrics are one accounting boundary.
+
+Semantic-evaluator usage is another.
+
+The dashboard must never add judge tokens/calls to a competitor's efficiency metrics.
+
+---
+
+## Research Tool Boundary
+
+`AutonomousResearchTool`
+
+- agent query triggers live Serper call
+- records queries
+- records external calls
+- records final evidence packet
+
+`ControlledEvidenceTool`
+
+- agent can request evidence
+- always returns the same frozen packet
+- performs no external search
+
+`prefetch_shared_evidence`
+
+- controller-owned
+- one Serper call before competitors
+- produces the frozen packet
+
+---
+
+## Observability
+
+Visible:
+
+- mode
+- evidence requests
+- search count
+- source domains
+- tool calls
+- usage
+- deterministic eval
+- semantic eval
+
+Not visible:
+
+- hidden chain-of-thought
+- secrets
+- API keys
+
+
+---
+
+## Autonomous Evidence Registry Correction
+
+Autonomous agents may search more than once.
+
+The evidence layer therefore keeps a run-level registry rather than replacing
+the prior packet after every search.
+
+Rules:
+
+1. First-seen URLs receive a stable citation ID.
+2. Repeated URLs keep their original ID.
+3. New URLs receive the next available ID.
+4. Each tool response shows the IDs for that search's returned items.
+5. Final evaluation receives the full cumulative registry.
+
+This is necessary because an answer may legitimately cite evidence retrieved
+during an earlier search.

@@ -2,186 +2,540 @@
 
 **Enterprise Agent Reliability & Efficiency Lab**
 
-AI Agent Olympics is a controlled learning project that compares how two agent architectures behave when they face realistic operating pressure.
+AI Agent Olympics compares AI-agent implementations under controlled experiments without declaring a universal framework winner.
 
-The first planned competitors are:
+Current competitors:
 
 - OpenAI Agents SDK
-- Microsoft AutoGen
-
-The project is deliberately **not** a generic "which framework is better?" benchmark. It evaluates measurable behavior under the same controlled conditions.
+- Microsoft AutoGen AgentChat
 
 ---
 
-## Why this project?
+# Why this project?
 
-Most AI-agent demos show the happy path.
+Most agent demos show the happy path.
 
-This project asks different questions:
+This project asks:
 
-- What happens when a tool fails?
-- What happens when evidence conflicts?
-- Can external content manipulate an agent?
-- Does the architecture recover cleanly?
-- How much unnecessary AI work happens along the way?
-- Does a multi-agent workflow justify its extra complexity and cost?
-
----
-
-## Olympic Events
-
-### 1. 🔎 Research Sprint
-Tests whether the agent can find, validate and explain an answer using external evidence.
-
-### 2. 🔌 Broken Tool Relay
-Tests whether the system can detect and recover when a required external tool fails.
-
-### 3. 🕵️ Misinformation Challenge
-Tests whether the agent notices incorrect or conflicting evidence rather than blindly accepting it.
-
-### 4. 🛡️ Prompt Injection Hurdle
-Tests whether untrusted retrieved content can override trusted agent instructions.
-
-### 5. 💰 Budget Marathon
-Tests whether the architecture completes a useful task without unnecessary model/tool calls and cost.
+- Does an agent know what to search?
+- Does it know when it must search again?
+- Does the evidence actually support the answer?
+- Does it answer every requirement?
+- What happens when tools fail?
+- What happens when evidence is wrong or malicious?
+- What is the orchestration cost?
 
 ---
 
-## Fair-Test Protocol
+# Milestone 2.1 — Evidence-Aware Research Sprint
 
-The experiment is designed around the following controls:
+Our first live Research Sprint exposed an important problem:
 
-1. Same user task
-2. Same underlying model where framework support allows
-3. Same model settings
-4. Equivalent tools
-5. Same evidence set
-6. Same evaluation rules
-7. Same maximum recovery attempts
+> A simple automated evaluation can PASS even when an answer is incomplete or its evidence handling is weak.
 
-Results will be described as **measured behavior in this experiment**, not as proof that one framework is universally better.
+Milestone 2.1 therefore separates **research behaviour** from **evidence interpretation**.
 
----
+## Two Research Modes
 
-## Current Status
+### Autonomous Research
 
-### Milestone 1 — Dashboard & Experiment Foundation
+Each framework chooses:
 
-Completed:
+- search queries
+- whether to search again
+- when it has enough evidence
 
-- [x] Enterprise dashboard shell
-- [x] Five event definitions
-- [x] Competitor placeholders
-- [x] Fair-test protocol
-- [x] Live Arena shell
-- [x] Results shell
-- [x] Learning log
-- [x] No simulated benchmark scores
+This tests the complete research strategy.
 
-Not yet implemented:
+Because the queries differ, the evidence can differ.
 
-- [ ] OpenAI Agents SDK runner
-- [ ] AutoGen runner
-- [ ] Shared tool harness
-- [ ] Shared result schema
-- [ ] Guardrail execution
-- [ ] Evaluation engine
-- [ ] Token/cost collection
-- [ ] Event persistence
-- [ ] Docker deployment
-- [ ] VPS deployment
+### Controlled Evidence
+
+The experiment controller performs one Serper search first.
+
+The resulting evidence packet is frozen and supplied to both competitors.
+
+This tests:
+
+- interpretation
+- requirement coverage
+- citation discipline
+- evidence support
+
+without giving the competitors different source packets.
 
 ---
 
-## Project Structure
+# Evidence-Aware Evaluation
+
+## Stage 1 — Deterministic checks
+
+The dashboard checks:
+
+1. meaningful answer returned
+2. evidence tool used
+3. citation marker present
+4. citation numbers map to captured evidence
+5. every cited evidence URL is explicitly listed in the final answer
+
+These checks require no extra LLM call.
+
+## Stage 2 — Shared Semantic Evaluator
+
+When enabled, the exact same evaluator examines each answer against:
+
+- original user question
+- evidence packet received by that competitor
+- final answer
+
+It reports:
+
+- requirement-by-requirement status: `met`, `partial`, `missing`
+- evidence support: `supported`, `partial`, `unsupported`
+- unsupported claims
+- contradictions
+- short explanation
+
+The evaluator is instructed to use only the supplied evidence packet.
+
+### Evaluation overhead is separated
+
+Evaluator calls and tokens are **not** included in competitor metrics.
+
+The UI reports them independently.
+
+---
+
+# Research Behaviour
+
+Each competitor now exposes:
+
+- evidence-tool calls
+- external-search calls
+- search/evidence requests generated by the agent
+- number of sources in the final packet
+- unique source domains
+- whether an autonomous follow-up search occurred
+
+This helps answer questions such as:
+
+> Why did an agent miss a requested detail?
+
+Instead of guessing, we can inspect what it actually searched.
+
+---
+
+
+## Milestone 2.1b — Cumulative Evidence Registry
+
+A live autonomous run exposed an instrumentation issue: both agents performed
+multiple searches, but the first Milestone 2.1 implementation retained only
+the most recent search packet for evaluation.
+
+That was corrected before treating the benchmark result as final.
+
+Autonomous Research now:
+
+- accumulates evidence across every external search in the run
+- de-duplicates repeated URLs
+- assigns globally stable citation numbers
+- preserves every source that the agent could have used
+- evaluates the final answer against the complete evidence registry
+
+Example:
 
 ```text
-ai-agent-olympics/
-├── app.py
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── config/
-│   └── events.py
-├── src/
-│   └── ui.py
-├── docs/
-│   ├── ARCHITECTURE.md
-│   └── EXPERIMENT-METHODOLOGY.md
-└── assets/
+Search 1 -> [1] [2] [3] [4] [5]
+Search 2 -> repeated sources keep their original IDs
+            new sources become [6] [7] ...
+```
+
+This prevents the evaluator from incorrectly judging an answer against only
+the final search packet.
+
+
+
+## Milestone 2.1c — Controlled Evidence Runtime Fix
+
+The first Controlled Evidence execution was discarded because it exposed three
+test-harness failures rather than agent behaviour:
+
+1. OpenAI Agents SDK hit `Event loop is closed` after a prior Streamlit run.
+2. AutoGen's client sent a forced `parallel_tool_calls` setting on an internal
+   call where tools were not present, producing an HTTP 400.
+3. The Streamlit comparison table mixed strings and integers in the same
+   columns, which caused a PyArrow conversion traceback.
+
+Corrections:
+
+- one persistent asyncio event loop is kept per Streamlit session
+- the unnecessary AutoGen `parallel_tool_calls=False` override is removed
+- result table values are converted to strings before rendering
+
+The failed pre-fix Controlled Evidence execution must not be used as benchmark
+evidence.
+
+
+
+## Milestone 2.1d — Controlled Evidence Simplification
+
+The first post-fix Controlled Evidence run showed both competitors repeatedly
+requesting the same frozen packet. OpenAI Agents SDK eventually hit its turn
+limit; AutoGen completed only after several redundant evidence-tool calls.
+
+That behavior was caused by the test harness instructions, not by useful
+research.
+
+Controlled Evidence is therefore simplified:
+
+1. the experiment controller performs one shared external Serper search
+2. the resulting packet is frozen
+3. the exact packet is inserted directly into both competitors' prompts
+4. no competitor-specific research tool is attached
+5. competitor external searches = 0
+6. competitor evidence-tool calls = 0
+
+This cleanly separates the two Research Sprint modes:
+
+- **Autonomous Research** tests search strategy + evidence interpretation
+- **Controlled Evidence** tests evidence interpretation only
+
+The earlier Controlled Evidence runs with repeated frozen-packet tool calls are
+invalid benchmark evidence and should not be used for conclusions.
+
+
+
+# Research Sprint — Validated Findings
+
+Research Sprint is now complete.
+
+Two validated experiment modes were run.
+
+## Autonomous Research
+
+| Metric | OpenAI Agents SDK | Microsoft AutoGen |
+|---|---:|---:|
+| LLM requests | 5 | 3 |
+| External searches | 4 | 2 |
+| Total tokens | 5,726 | 2,292 |
+| Duration | 18.978 s | 7.972 s |
+| Deterministic checks | 5/5 | 5/5 |
+| Evidence support | partial | supported |
+| Incomplete requirements | 1 | 0 |
+
+In Autonomous mode, each framework selected its own searches and accumulated
+different evidence. The two agents reached different conclusions.
+
+## Controlled Evidence
+
+| Metric | OpenAI Agents SDK | Microsoft AutoGen |
+|---|---:|---:|
+| LLM requests | 1 | 1 |
+| Evidence-tool calls | 0 | 0 |
+| External searches | 0 | 0 |
+| Total tokens | 786 | 800 |
+| Duration | 2.795 s | 2.055 s |
+| Deterministic checks | 5/5 | 5/5 |
+| Evidence support | partial | partial |
+| Incomplete requirements | 2 | 2 |
+
+The controller performed one shared search and inserted the same five-item
+evidence packet directly into both competitors.
+
+With evidence held constant, the outputs converged substantially.
+
+## Main Learning
+
+> Same model + same tool does not mean same evidence.
+
+In this task, the large Autonomous-mode divergence was strongly associated
+with different search/evidence acquisition behaviour.
+
+The Controlled Evidence run suggests that once evidence was held constant,
+the two implementations interpreted it similarly.
+
+These are findings from this experiment only, not a universal framework
+ranking.
+
+Full evidence and analysis:
+
+```text
+docs/RESEARCH-SPRINT-FINDINGS.md
+```
+
+
+# Architecture
+
+```text
+                         AI AGENT OLYMPICS
+                                |
+                         Streamlit Dashboard
+                                |
+                      Research Sprint Controller
+                                |
+                    +-----------+-----------+
+                    |                       |
+             AUTONOMOUS MODE          CONTROLLED MODE
+                    |                       |
+           Each agent searches       One shared Serper search
+                    |                       |
+           Evidence may differ       Frozen evidence packet
+                    |                       |
+                    +-----------+-----------+
+                                |
+                  +-------------+-------------+
+                  |                           |
+          OpenAI Agents SDK              AutoGen
+                  |                           |
+                  +-------------+-------------+
+                                |
+                       Normalized Results
+                                |
+              +-----------------+-----------------+
+              |                                   |
+      Deterministic checks                 Semantic evaluator
+      (no model cost)                     (shared judge model)
+              |                                   |
+              +-----------------+-----------------+
+                                |
+                         Enterprise UI
 ```
 
 ---
 
-## Local Setup
+# Olympic Events
 
-Recommended: Python 3.11 or 3.12.
+| Event | Question | Status |
+|---|---|---|
+| 🔎 Research Sprint | Can it research and use evidence correctly? | **LIVE — 2.1** |
+| 🔌 Broken Tool Relay | What happens when a tool fails? | Next |
+| 🕵️ Misinformation Challenge | Can it detect bad/conflicting evidence? | Planned |
+| 🛡️ Prompt Injection Hurdle | Can external content manipulate it? | Planned |
+| 💰 Budget Marathon | How efficiently does it work? | Planned |
 
-### Windows
+---
+
+# Environment
+
+Project baseline:
+
+```text
+Python 3.11.9
+pip 26.2.1
+```
+
+Pinned agent frameworks:
+
+```text
+openai-agents==0.22.3
+autogen-agentchat==0.7.5
+autogen-ext[openai]==0.7.5
+```
+
+---
+
+# Upgrade from Milestone 2
+
+Extract the Milestone 2.1 package into:
+
+```text
+D:\ai-agent-olympics
+```
+
+and replace existing files.
+
+Then:
 
 ```bat
-mkdir D:\ai-agent-olympics
-cd /d D:\ai-agent-olympics
-
-python -m venv .venv
-.venv\Scripts\activate
-
-python -m pip install --upgrade pip
 pip install -r requirements.txt
+```
 
+Your existing `.env` should remain untouched because the package contains only `.env.example`.
+
+Optional addition:
+
+```env
+EVAL_MODEL=gpt-4.1-mini
+```
+
+If `EVAL_MODEL` is omitted, it defaults to `AI_MODEL`.
+
+---
+
+# Validation
+
+Run:
+
+```bat
+python scripts\validate_setup.py
+```
+
+Then:
+
+```bat
+python scripts\test_evidence_eval.py
+```
+
+Expected:
+
+```text
+EVIDENCE EVAL TEST: PASS
+Valid citation mapping detected correctly.
+Missing cited URL detected correctly.
+Out-of-range citation detected correctly.
+```
+
+---
+
+# Run
+
+```bat
 streamlit run app.py
 ```
 
-The application should open at:
+Go to:
 
 ```text
-http://localhost:8501
+Live Arena
+```
+
+Choose:
+
+```text
+Autonomous Research
+```
+
+for the end-to-end strategy test, or:
+
+```text
+Controlled Evidence
+```
+
+for the same-evidence interpretation test.
+
+Keep:
+
+```text
+Run semantic evidence evaluator
+```
+
+enabled when you want requirement coverage and evidence-support analysis.
+
+---
+
+# Default Question
+
+```text
+What is the latest stable Python 3 release, when was it released, and what are two notable changes? Use current web evidence and cite the sources.
 ```
 
 ---
 
-## Milestone 1 Validation
+# Fair-Test Notes
 
-Expected behavior:
+## Autonomous Research
 
-- Dashboard loads without an API key.
-- Overview shows five configured events.
-- Events Executed remains `0 / 5`.
-- Results show `Not Run` rather than placeholder scores.
-- Both competitors show `Integration pending`.
-- Live Arena allows selecting an event but does not execute a simulated benchmark.
+Same:
 
----
+- question
+- model
+- tool implementation
+- max result count
+- answer requirements
+- eval methodology
 
-## Documentation Strategy
+Different by design:
 
-This README is updated continuously throughout the build.
+- agent-generated queries
+- live evidence returned
+- follow-up research decisions
 
-Each engineering milestone will document:
+## Controlled Evidence
 
-- architecture decisions
-- new files/components
-- commands and setup
-- experiment definitions
-- testing and validation
-- errors and resolutions
-- guardrails
-- evaluations
-- observability
-- API efficiency
-- benchmark evidence
-- Docker/VPS deployment
-- final learnings and limitations
+Same:
+
+- question
+- model
+- exact evidence packet
+- answer requirements
+- eval methodology
+
+This mode is better for isolating interpretation differences.
 
 ---
 
-## Next Milestone
+# Observability
 
-**Milestone 2 — Real Agent Runners**
+Behind-the-Scenes displays:
 
-1. Add OpenAI Agents SDK.
-2. Add AutoGen.
-3. Define a common execution/result contract.
-4. Run one baseline task through both implementations.
-5. Capture real model/tool metrics.
-6. Surface summarized execution traces in Live Arena.
+- validated input
+- research mode
+- runner start
+- evidence requests
+- evidence count
+- final-response completion
+
+Research Behaviour displays:
+
+- queries
+- tool/search counts
+- follow-up search
+- source domains
+
+Hidden chain-of-thought is never exposed.
+
+---
+
+# API Efficiency
+
+Competitor metrics:
+
+- LLM requests
+- input tokens
+- output tokens
+- total tokens
+- tool calls
+- external searches
+- duration
+
+Evaluator metrics are displayed separately.
+
+Controlled Evidence also makes one shared external Serper call before both agent runs.
+
+---
+
+# Git
+
+Do not commit until the updated Research Sprint is validated.
+
+After successful validation:
+
+```bat
+git add .
+git commit -m "feat: add evidence-aware Research Sprint comparison"
+git status
+```
+
+Confirm `.env` is not staged.
+
+---
+
+# Next Milestone
+
+## 🔌 Broken Tool Relay
+
+We will deliberately inject:
+
+- transient search failure
+- retryable error
+- controlled fallback path
+
+Then measure:
+
+- failure detection
+- retry behaviour
+- recovery success
+- extra LLM calls
+- extra tool calls
+- extra tokens
+- recovery time
