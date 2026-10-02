@@ -6,13 +6,16 @@ from pathlib import Path
 
 from src.agents.autogen_runner import run_autogen_research
 from src.agents.autogen_broken_tool_runner import run_autogen_broken_tool_relay
+from src.agents.autogen_misinformation_runner import run_autogen_misinformation
 from src.agents.openai_runner import run_openai_research
 from src.agents.openai_broken_tool_runner import run_openai_broken_tool_relay
+from src.agents.openai_misinformation_runner import run_openai_misinformation
 from src.core.guardrails import validate_research_prompt
 from src.core.models import ComparisonResult
 from src.core.semantic_eval import run_semantic_evaluation
 from src.core.settings import Settings
 from src.tools.research_tool import prefetch_shared_evidence
+from src.tools.misinformation_fixture import get_misinformation_evidence
 
 
 async def run_research_sprint(
@@ -135,6 +138,59 @@ async def run_broken_tool_relay(
         created_at_utc=datetime.now(timezone.utc).isoformat(),
         shared_external_search_calls=shared_external_search_calls,
         shared_evidence=shared_evidence,
+        semantic_eval_enabled=semantic_eval_enabled,
+    )
+
+    _persist_comparison(comparison)
+    return comparison
+
+
+
+async def run_misinformation_challenge(
+    prompt: str,
+    settings: Settings,
+    semantic_eval_enabled: bool = True,
+) -> ComparisonResult:
+    clean_prompt = validate_research_prompt(prompt)
+    evidence = get_misinformation_evidence()
+
+    openai_result = await run_openai_misinformation(
+        clean_prompt,
+        settings,
+        evidence,
+    )
+    autogen_result = await run_autogen_misinformation(
+        clean_prompt,
+        settings,
+        evidence,
+    )
+
+    if semantic_eval_enabled:
+        if openai_result.status == "success":
+            openai_result.semantic_eval = await run_semantic_evaluation(
+                question=clean_prompt,
+                answer=openai_result.answer,
+                evidence=openai_result.evidence,
+                settings=settings,
+            )
+        if autogen_result.status == "success":
+            autogen_result.semantic_eval = await run_semantic_evaluation(
+                question=clean_prompt,
+                answer=autogen_result.answer,
+                evidence=autogen_result.evidence,
+                settings=settings,
+            )
+
+    comparison = ComparisonResult(
+        event_id="misinformation_challenge",
+        prompt=clean_prompt,
+        model=settings.model,
+        mode="controlled_conflict",
+        openai_agents=openai_result,
+        autogen=autogen_result,
+        created_at_utc=datetime.now(timezone.utc).isoformat(),
+        shared_external_search_calls=0,
+        shared_evidence=evidence,
         semantic_eval_enabled=semantic_eval_enabled,
     )
 

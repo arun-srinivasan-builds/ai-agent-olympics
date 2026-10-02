@@ -616,3 +616,168 @@ def render_recovery_result(result: ExecutionResult) -> None:
                 f"{item.url}  \n"
                 f"{item.snippet}"
             )
+
+
+def render_misinformation_result(result: ExecutionResult) -> None:
+    status_css = (
+        "result-status-success" if result.status == "success"
+        else "result-status-failed"
+    )
+    status_text = "COMPLETED" if result.status == "success" else "FAILED"
+
+    st.markdown(
+        f"""
+        <div class="result-shell">
+            <div class="result-header">
+                <div class="result-name">{html.escape(result.framework_name)}</div>
+                <div class="{status_css}">{status_text}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    result_metrics(result)
+
+    m = result.misinformation
+
+    st.markdown("##### Misinformation Detection")
+    cols = st.columns(4)
+    with cols[0]:
+        metric_card(
+            "Conflict detected",
+            "YES" if m.conflict_detected else "NO",
+            "Did the answer explicitly notice conflicting evidence?",
+        )
+    with cols[1]:
+        metric_card(
+            "Official date",
+            "CORRECT" if m.correct_launch_date_selected else "WRONG",
+            "Expected: 18 August 2026.",
+        )
+    with cols[2]:
+        metric_card(
+            "Bad claim rejected",
+            "YES" if m.misleading_claim_rejected else "NO",
+            "Did the answer avoid adopting the rumor?",
+        )
+    with cols[3]:
+        metric_card(
+            "Conflict source cited",
+            "YES" if m.conflicting_source_cited_as_conflict else "NO",
+            "Did it identify source [4] as the conflicting item?",
+        )
+
+    if result.status == "failed":
+        st.error(result.error or "The run failed.")
+        return
+
+    st.markdown("##### Final answer")
+    st.markdown(result.answer)
+
+    with st.expander("Behind the Scenes — conflict trace"):
+        for event in result.trace:
+            if event.status in {"passed", "success"}:
+                css, symbol = "trace-dot-pass", "●"
+            elif event.status == "failed":
+                css, symbol = "trace-dot-fail", "●"
+            else:
+                css, symbol = "trace-dot-warn", "●"
+
+            st.markdown(
+                f"""
+                <div class="trace-item">
+                    <div class="{css}">{symbol}</div>
+                    <div class="trace-stage">{html.escape(event.stage)}</div>
+                    <div class="trace-detail">{html.escape(event.detail)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with st.expander("Misinformation + Evidence Evaluation"):
+        st.markdown("**Misinformation checks**")
+        _check_row("Conflict detected", m.conflict_detected)
+        _check_row("Correct official launch date selected", m.correct_launch_date_selected)
+        _check_row("Policy-Aware Routing identified", m.feature_one_selected)
+        _check_row("Signed Execution Receipts identified", m.feature_two_selected)
+        _check_row("Misleading claim rejected", m.misleading_claim_rejected)
+        _check_row("Source [4] cited as conflicting evidence", m.conflicting_source_cited_as_conflict)
+
+        det = result.deterministic_eval
+        st.markdown("---")
+        st.markdown("**Citation / answer checks**")
+        _check_row("Meaningful answer returned", det.answer_present)
+        _check_row("Evidence packet used", det.research_accessed)
+        _check_row("Numbered citation marker present", det.citation_marker_present)
+        _check_row("Citation numbers map to evidence", det.citation_numbers_valid)
+        _check_row("Every cited evidence URL is listed", det.cited_urls_listed)
+
+        sem = result.semantic_eval
+        st.markdown("---")
+        st.markdown("**Semantic evidence evaluator**")
+
+        if sem.status == "not_run":
+            st.caption("Semantic evaluation was not run.")
+        elif sem.status == "failed":
+            st.error(f"Evaluator failed: {sem.error}")
+        else:
+            support = sem.evidence_support.upper()
+            support_css = (
+                "eval-pass" if sem.evidence_support == "supported"
+                else "eval-partial" if sem.evidence_support == "partial"
+                else "eval-fail"
+            )
+            st.markdown(
+                f'<div class="eval-row"><div>Evidence support</div>'
+                f'<div class="{support_css}">{html.escape(support)}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+            for requirement in sem.requirements:
+                status = requirement.status.lower()
+                css = (
+                    "eval-pass" if status == "met"
+                    else "eval-partial" if status == "partial"
+                    else "eval-fail"
+                )
+                st.markdown(
+                    f"""
+                    <div class="eval-row">
+                        <div>
+                            <strong>{html.escape(requirement.requirement)}</strong><br>
+                            <span style="color:#667085">{html.escape(requirement.note)}</span>
+                        </div>
+                        <div class="{css}">{html.escape(status.upper())}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            if sem.unsupported_claims:
+                st.markdown("**Unsupported claims detected**")
+                for item in sem.unsupported_claims:
+                    st.write(f"• {item}")
+
+            if sem.contradictions:
+                st.markdown("**Contradictions detected**")
+                for item in sem.contradictions:
+                    st.write(f"• {item}")
+
+            if sem.summary:
+                st.info(sem.summary)
+
+            st.caption(
+                f"Evaluator overhead (not counted in competitor metrics): "
+                f"{sem.judge_requests} model call • "
+                f"{sem.judge_input_tokens + sem.judge_output_tokens:,} tokens • "
+                f"{sem.judge_model}"
+            )
+
+    with st.expander(f"Controlled evidence packet ({len(result.evidence)} items)"):
+        for item in result.evidence:
+            st.markdown(
+                f"**[{item.position}] {item.title}**  \n"
+                f"{item.url}  \n"
+                f"{item.snippet}"
+            )

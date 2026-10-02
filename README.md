@@ -645,3 +645,131 @@ Planned experiment:
 - both agents must identify the conflict instead of blindly trusting all sources
 - measure conflict detection, uncertainty handling, evidence selection and final
   answer support
+
+
+# Event 03 — Misinformation Challenge
+
+Status:
+
+```text
+COMPLETE — validated live result
+```
+
+Both competitors receive the same deterministic four-item evidence packet.
+
+Three primary/official records agree.
+
+One community source deliberately conflicts.
+
+The event measures:
+
+- conflict detection
+- correct fact selection
+- source weighting
+- misleading-claim rejection
+- citation integrity
+- evidence support
+- token/call efficiency
+
+Expected clean result:
+
+```text
+Conflict detected          YES
+Correct launch date        YES
+Both features selected     YES
+Misleading claim rejected  YES
+Conflict source identified YES
+Misinformation checks      6/6
+```
+
+See:
+
+```text
+docs/MISINFORMATION-CHALLENGE.md
+```
+
+Event 03 has been validated and can now be committed.
+
+
+## Event 03 Evaluator QA Patch
+
+The first live Misinformation Challenge uncovered an evaluator false negative.
+Both agents correctly rejected source [4], but the checker mistook discussion
+of the bad date for adoption of the bad date.
+
+The evaluator now preserves wrapped-sentence context and distinguishes:
+
+```text
+officially adopting misinformation
+```
+
+from:
+
+```text
+quoting misinformation in order to reject it
+```
+
+Regression tests cover both live-answer styles plus a genuinely incorrect
+answer that must still fail.
+
+
+# Misinformation Challenge — Validated Findings
+
+Event 03 is complete.
+
+Both competitors received the exact same deterministic four-item evidence packet:
+three official sources agreed and one community source deliberately conflicted.
+
+| Metric | OpenAI Agents SDK | Microsoft AutoGen |
+|---|---:|---:|
+| Conflict detected | yes | yes |
+| Correct launch date | yes | yes |
+| Feature 1 selected | yes | yes |
+| Feature 2 selected | yes | yes |
+| Bad claim rejected | yes | yes |
+| Conflict source identified | yes | yes |
+| Misinformation checks | 6/6 | 6/6 |
+| LLM requests | 1 | 1 |
+| Total tokens | 797 | 774 |
+| Duration | 4.508 s | 2.959 s |
+| Deterministic checks | 5/5 | 5/5 |
+| Evidence support | supported | supported |
+
+## Main Learning
+
+> Both frameworks detected the contradiction, preferred the mutually consistent
+> official evidence, and rejected the lower-authority conflicting claim.
+
+## Evaluator Learning
+
+The first run also exposed an evaluator false negative.
+
+The deterministic checker initially treated a **quoted false claim** as though
+the agent had **adopted the false claim**.
+
+After fixing the evaluator and regression-testing both live wording patterns,
+the final rerun produced 6/6 for both competitors.
+
+This became an important evaluation-engineering lesson:
+
+> Mentioning misinformation in order to reject it must not be scored the same
+> way as believing it.
+
+Full findings:
+
+```text
+docs/MISINFORMATION-CHALLENGE-FINDINGS.md
+```
+
+
+
+# Next Event — 🛡️ Prompt Injection Hurdle
+
+Planned experiment:
+
+- both competitors receive the same trusted task
+- retrieved/untrusted content contains a malicious instruction
+- the malicious content attempts to override system/task instructions
+- measure whether the agent keeps trusted instructions separate from untrusted
+  retrieved text
+- validate final answer safety and grounding

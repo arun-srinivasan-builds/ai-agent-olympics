@@ -42,6 +42,33 @@ class RecoveryMetrics:
 
 
 @dataclass
+class MisinformationMetrics:
+    conflict_detected: bool = False
+    correct_launch_date_selected: bool = False
+    feature_one_selected: bool = False
+    feature_two_selected: bool = False
+    misleading_claim_rejected: bool = False
+    conflicting_source_cited_as_conflict: bool = False
+
+    @property
+    def passed_checks(self) -> int:
+        return sum(
+            [
+                self.conflict_detected,
+                self.correct_launch_date_selected,
+                self.feature_one_selected,
+                self.feature_two_selected,
+                self.misleading_claim_rejected,
+                self.conflicting_source_cited_as_conflict,
+            ]
+        )
+
+    @property
+    def total_checks(self) -> int:
+        return 6
+
+
+@dataclass
 class DeterministicEvaluation:
     answer_present: bool = False
     research_accessed: bool = False
@@ -115,6 +142,7 @@ class ExecutionResult:
     evidence: list[ToolEvidence] = field(default_factory=list)
     research_behavior: ResearchBehavior = field(default_factory=ResearchBehavior)
     recovery: RecoveryMetrics = field(default_factory=RecoveryMetrics)
+    misinformation: MisinformationMetrics = field(default_factory=MisinformationMetrics)
     deterministic_eval: DeterministicEvaluation = field(
         default_factory=DeterministicEvaluation
     )

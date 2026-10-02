@@ -5,6 +5,7 @@ import streamlit as st
 from config.events import (
     BROKEN_TOOL_PREFETCH_QUERY,
     BROKEN_TOOL_PROMPT,
+    MISINFORMATION_PROMPT,
     COMPETITORS,
     DEFAULT_RESEARCH_PROMPT,
     EVENTS,
@@ -13,6 +14,7 @@ from config.events import (
 )
 from src.core.experiment_runner import (
     run_broken_tool_relay,
+    run_misinformation_challenge,
     run_research_sprint,
 )
 from src.core.guardrails import InputGuardrailError
@@ -24,6 +26,7 @@ from src.ui import (
     inject_global_css,
     metric_card,
     render_recovery_result,
+    render_misinformation_result,
     render_result,
     section_title,
 )
@@ -57,6 +60,7 @@ settings = get_settings()
 
 st.session_state.setdefault("research_comparison", None)
 st.session_state.setdefault("relay_comparison", None)
+st.session_state.setdefault("misinformation_comparison", None)
 
 st.markdown(
     """
@@ -68,7 +72,7 @@ st.markdown(
                 <div class="brand-subtitle">Enterprise Agent Reliability & Efficiency Lab</div>
             </div>
         </div>
-        <div class="lab-badge"><span class="lab-dot"></span> EVENT 02 LIVE</div>
+        <div class="lab-badge"><span class="lab-dot"></span> EVENT 03 LIVE</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -161,15 +165,158 @@ elif page == "Live Arena":
 
     selected_event = st.selectbox(
         "Olympic event",
-        ["broken_tool_relay", "research_sprint"],
+        ["misinformation_challenge", "broken_tool_relay", "research_sprint"],
         format_func=lambda event_id: (
-            "🔌 Broken Tool Relay — LIVE"
+            "🕵️ Misinformation Challenge — LIVE"
+            if event_id == "misinformation_challenge"
+            else "🔌 Broken Tool Relay — COMPLETE"
             if event_id == "broken_tool_relay"
             else "🔎 Research Sprint — COMPLETE"
         ),
     )
 
-    if selected_event == "broken_tool_relay":
+    if selected_event == "misinformation_challenge":
+        st.markdown(
+            """
+            <div class="event-card">
+                <div class="event-title-row">
+                    <span class="event-icon">🕵️</span>
+                    <div>
+                        <div class="event-number">EVENT 03 • LIVE</div>
+                        <div class="event-name">Misinformation Challenge</div>
+                        <div class="event-question">
+                            Three evidence items agree. One deliberately conflicts.
+                        </div>
+                    </div>
+                </div>
+                <div class="event-business">
+                    <strong>Controlled setup:</strong> both competitors receive the exact same
+                    four-item evidence packet. Sources [1]-[3] agree; source [4] contains a
+                    deliberate conflicting claim with lower authority.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        prompt = st.text_area(
+            "Misinformation challenge task",
+            value=MISINFORMATION_PROMPT,
+            height=120,
+        )
+
+        semantic_eval_enabled = st.checkbox(
+            "Run semantic evidence evaluator",
+            value=True,
+            key="misinformation_semantic",
+        )
+
+        if st.button(
+            "🕵️ Run Misinformation Challenge",
+            type="primary",
+            disabled=not settings.ready,
+        ):
+            try:
+                with st.status("Running Misinformation Challenge...", expanded=True) as status:
+                    st.write("1/3 — Supplying same four-item evidence packet to OpenAI Agents SDK")
+                    st.write("2/3 — Supplying same packet to AutoGen")
+                    st.write("3/3 — Measuring conflict detection and evidence selection")
+
+                    comparison = run_async(
+                        run_misinformation_challenge(
+                            prompt=prompt,
+                            settings=settings,
+                            semantic_eval_enabled=semantic_eval_enabled,
+                        )
+                    )
+                    st.session_state.misinformation_comparison = comparison
+                    status.update(
+                        label="Misinformation Challenge completed",
+                        state="complete",
+                        expanded=False,
+                    )
+            except Exception as exc:
+                st.error(f"Event controller failed: {type(exc).__name__}: {exc}")
+
+        comparison = st.session_state.misinformation_comparison
+
+        if comparison:
+            st.info(
+                "Controlled fixture: sources [1]-[3] are consistent official/primary records; "
+                "source [4] is an intentionally conflicting community claim."
+            )
+
+            tabs = st.tabs(["OpenAI Agents SDK", "Microsoft AutoGen"])
+            with tabs[0]:
+                render_misinformation_result(comparison.openai_agents)
+            with tabs[1]:
+                render_misinformation_result(comparison.autogen)
+
+            section_title(
+                "Side-by-Side Misinformation Metrics",
+                "Descriptive measurements from the same controlled evidence conflict.",
+            )
+
+            oa = comparison.openai_agents
+            ag = comparison.autogen
+
+            st.table(
+                {
+                    "Metric": [
+                        "Run status",
+                        "Conflict detected",
+                        "Correct launch date",
+                        "Feature 1 selected",
+                        "Feature 2 selected",
+                        "Bad claim rejected",
+                        "Conflict source identified",
+                        "Misinformation checks",
+                        "LLM requests",
+                        "Input tokens",
+                        "Output tokens",
+                        "Total tokens",
+                        "Duration (seconds)",
+                        "Deterministic checks",
+                        "Evidence support",
+                    ],
+                    "OpenAI Agents SDK": [
+                        as_text(oa.status),
+                        as_text(oa.misinformation.conflict_detected),
+                        as_text(oa.misinformation.correct_launch_date_selected),
+                        as_text(oa.misinformation.feature_one_selected),
+                        as_text(oa.misinformation.feature_two_selected),
+                        as_text(oa.misinformation.misleading_claim_rejected),
+                        as_text(oa.misinformation.conflicting_source_cited_as_conflict),
+                        f"{oa.misinformation.passed_checks}/{oa.misinformation.total_checks}",
+                        as_text(oa.llm_requests),
+                        as_text(oa.input_tokens),
+                        as_text(oa.output_tokens),
+                        as_text(oa.total_tokens),
+                        as_text(oa.duration_seconds),
+                        f"{oa.deterministic_eval.passed_checks}/{oa.deterministic_eval.total_checks}",
+                        as_text(oa.semantic_eval.evidence_support),
+                    ],
+                    "Microsoft AutoGen": [
+                        as_text(ag.status),
+                        as_text(ag.misinformation.conflict_detected),
+                        as_text(ag.misinformation.correct_launch_date_selected),
+                        as_text(ag.misinformation.feature_one_selected),
+                        as_text(ag.misinformation.feature_two_selected),
+                        as_text(ag.misinformation.misleading_claim_rejected),
+                        as_text(ag.misinformation.conflicting_source_cited_as_conflict),
+                        f"{ag.misinformation.passed_checks}/{ag.misinformation.total_checks}",
+                        as_text(ag.llm_requests),
+                        as_text(ag.input_tokens),
+                        as_text(ag.output_tokens),
+                        as_text(ag.total_tokens),
+                        as_text(ag.duration_seconds),
+                        f"{ag.deterministic_eval.passed_checks}/{ag.deterministic_eval.total_checks}",
+                        as_text(ag.semantic_eval.evidence_support),
+                    ],
+                }
+            )
+
+    elif selected_event == "broken_tool_relay":
         st.markdown(
             """
             <div class="event-card">
@@ -375,7 +522,7 @@ elif page == "Results":
 
     result_event = st.selectbox(
         "Result set",
-        ["broken_tool_relay", "research_sprint"],
+        ["misinformation_challenge", "broken_tool_relay", "research_sprint"],
         format_func=lambda value: (
             "🔌 Broken Tool Relay" if value == "broken_tool_relay"
             else "🔎 Research Sprint"
