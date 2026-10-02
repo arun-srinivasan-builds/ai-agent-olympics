@@ -1,0 +1,18 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db
+
+# Local benchmark outputs
+outputs/
+logs/
+*.log
+
+# Test/cache artifacts
+.pytest_cache/
+.coverage
+htmlcov/
