@@ -21,7 +21,16 @@ from src.core.experiment_runner import (
     run_prompt_injection_hurdle,
     run_research_sprint,
 )
+from src.core.guardrails import (
+    InputGuardrailError,
+    sanitize_public_comparison_output,
+    validate_public_arena_prompt,
+)
 from src.core.settings import get_settings
+from src.core.usage_guard import (
+    check_and_reserve_public_run,
+    get_public_run_usage,
+)
 from src.responsive_dashboard import inject_responsive_dashboard_css
 from src.premium_dashboard import (
     inject_approved_dashboard_css,
@@ -217,6 +226,21 @@ def run_arena_event(
     run_mode: str = "benchmark",
 ):
     """Run one Olympic event and show focused progress."""
+    if run_mode == "custom":
+        try:
+            prompt_override = validate_public_arena_prompt(
+                prompt_override or "",
+                settings.openai_api_key,
+            )
+        except InputGuardrailError as exc:
+            st.warning(f"🛡️ {exc}")
+            return None
+
+    usage = check_and_reserve_public_run(st.session_state, units=1)
+    if not usage.allowed:
+        st.warning(f"⏱️ {usage.message}")
+        return None
+
     event = next(item for item in ARENA_EVENTS if item["id"] == event_id)
     label = "custom experiment" if run_mode == "custom" else "controlled benchmark"
     with st.status(f"Running {event['title']} — {label}...", expanded=True) as status:
@@ -235,6 +259,11 @@ def run_arena_event(
                 prompt_override=prompt_override,
                 run_mode=run_mode,
             )
+            if run_mode == "custom":
+                comparison = sanitize_public_comparison_output(
+                    comparison,
+                    settings.openai_api_key,
+                )
             st.write("2/3 — Comparing OpenAI Agents SDK and Microsoft AutoGen")
             st.write("3/3 — Capturing metrics, deterministic checks and evidence-aware evaluation")
             status.update(label=f"{event['title']} completed", state="complete", expanded=False)
@@ -248,6 +277,11 @@ def run_arena_event(
 
 def run_all_arena_events(settings):
     """Run all five Olympic events sequentially using validated defaults."""
+    usage = check_and_reserve_public_run(st.session_state, units=5)
+    if not usage.allowed:
+        st.warning(f"⏱️ {usage.message}")
+        return {}
+
     batch_results = {}
     failures = []
     with st.status("Running all 5 Olympic events...", expanded=True) as status:
@@ -315,7 +349,7 @@ def render_arena_event_selector(settings):
         ):
             run_all_arena_events(settings)
             st.rerun()
-        st.caption("Uses the five official benchmark questions • sequential live API run")
+        st.caption("Uses the five official benchmark questions • sequential live API run • Public demo limits apply")
 
     # Always-visible question workspace. Users switch events with visible tabs.
     short_labels = {
@@ -333,6 +367,10 @@ def render_arena_event_selector(settings):
         key="arena_question_event",
     )
     question_event = next(item for item in ARENA_EVENTS if item["id"] == question_event_id)
+    used_runs, remaining_runs = get_public_run_usage(st.session_state)
+    st.caption(
+        f"Public demo availability: {remaining_runs} of 5 live event executions remaining in this browser session."
+    )
     prompt_key = f"arena_custom_prompt_{question_event_id}"
     official_prompt = OFFICIAL_ARENA_PROMPTS[question_event_id]
 
@@ -400,13 +438,14 @@ def render_arena_event_selector(settings):
                 if not selected_prompt:
                     st.warning("Enter a question before running the event.")
                 else:
-                    run_arena_event(
+                    comparison = run_arena_event(
                         question_event_id,
                         settings,
                         prompt_override=selected_prompt if is_custom else None,
                         run_mode="custom" if is_custom else "benchmark",
                     )
-                    st.rerun()
+                    if comparison is not None:
+                        st.rerun()
 
     if st.session_state.get("arena_batch_completed"):
         results = st.session_state.get("arena_batch_results", {})
