@@ -335,8 +335,10 @@ def render_arena_event_selector(settings):
     prompt_key = f"arena_custom_prompt_{question_event_id}"
     official_prompt = OFFICIAL_ARENA_PROMPTS[question_event_id]
 
-    def _reset_question():
-        st.session_state[prompt_key] = official_prompt
+    reset_pending_key = f"arena_reset_pending_{question_event_id}"
+
+    if st.session_state.pop(reset_pending_key, False):
+     st.session_state[prompt_key] = official_prompt
 
     current_before_widget = st.session_state.get(prompt_key, official_prompt)
     is_custom_before_widget = current_before_widget.strip() != official_prompt.strip()
@@ -377,14 +379,14 @@ def render_arena_event_selector(settings):
 
         with q_right:
             st.markdown('<div style="height:27px"></div>', unsafe_allow_html=True)
-            st.button(
+            if st.button(
                 "Reset to Benchmark Question",
                 key=f"arena_reset_top_{question_event_id}",
                 icon=":material/restart_alt:",
                 use_container_width=False,
-                on_click=_reset_question,
-                disabled=not is_custom_before_widget,
-            )
+            ):
+                st.session_state[reset_pending_key] = True
+                st.rerun()
             run_label = "Run Custom Experiment" if is_custom else "Run Benchmark Question"
             if st.button(
                 run_label,
