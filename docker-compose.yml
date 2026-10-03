@@ -3,13 +3,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     image: ai-agent-olympics:latest
     container_name: ai-agent-olympics
+
     restart: unless-stopped
+
     env_file:
       - .env
+
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8502:8501"
+
     healthcheck:
       test:
         [
