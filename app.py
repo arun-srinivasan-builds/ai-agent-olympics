@@ -22,6 +22,7 @@ from src.core.experiment_runner import (
     run_research_sprint,
 )
 from src.core.settings import get_settings
+from src.responsive_dashboard import inject_responsive_dashboard_css
 from src.premium_dashboard import (
     inject_approved_dashboard_css,
     inject_exact_approved_overrides,
@@ -919,7 +920,7 @@ st.set_page_config(
     page_title="AI Agent Olympics",
     page_icon="🏆",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="locked",
 )
 
 inject_global_css()
@@ -928,6 +929,7 @@ inject_exact_approved_overrides()
 inject_approved_design_lock_css()
 inject_final_reference_exact_css()
 inject_arena_event_selector_css()
+inject_responsive_dashboard_css()
 settings = get_settings()
 
 for key in [

@@ -443,7 +443,7 @@ def render_top_toolbar() -> None:
                 <span class="ao-topbar-app">AI Agent Olympics</span>
                 <span class="ao-topbar-context">MULTI-EVENT EVALUATION OF AI AGENT FRAMEWORKS</span>
             </div>
-            <div class="ao-topbar-date">▣ &nbsp; Oct 2026 &nbsp;⌄</div>
+            <div class="ao-topbar-date">● &nbsp; 5 EVENTS COMPLETE</div>
         </div>
         ''',
         unsafe_allow_html=True,
