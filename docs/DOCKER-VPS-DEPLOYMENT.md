@@ -2,9 +2,9 @@
 
 ## Deployment target
 
-The production container runs the Streamlit application on port `8501` using Python `3.11`.
+The production container runs the Streamlit application on internal port `8501` using Python `3.11`.
 
-The application expects these secrets through environment variables:
+The application expects these environment variables:
 
 ```text
 OPENAI_API_KEY
@@ -14,6 +14,12 @@ EVAL_MODEL
 ```
 
 Never commit the real `.env` file.
+
+Current public deployment:
+
+```text
+https://ai-agent-olympics.srv1965124.hstgr.cloud
+```
 
 ---
 
@@ -27,22 +33,28 @@ docker compose up -d
 docker compose ps
 ```
 
+Local host mapping:
+
+```text
+127.0.0.1:8502 -> container:8501
+```
+
 Open:
 
 ```text
-http://localhost:8501
+http://localhost:8502
 ```
 
 Validate container health:
 
 ```bat
-docker inspect ai-agent-olympics --format "{{json .State.Health}}"
+curl.exe http://localhost:8502/_stcore/health
 ```
 
-View logs:
+Expected:
 
-```bat
-docker compose logs -f ai-agent-olympics
+```text
+ok
 ```
 
 Stop the application:
@@ -55,13 +67,11 @@ docker compose down
 
 ## 2. VPS directory standard
 
-Recommended production directory:
+Production directory:
 
 ```text
 /docker/apps/AI-Agent-Olympics
 ```
-
-This follows the same enterprise deployment structure used by the other portfolio applications.
 
 ---
 
@@ -69,7 +79,7 @@ This follows the same enterprise deployment structure used by the other portfoli
 
 ```bash
 cd /docker/apps
-git clone <YOUR_GITHUB_REPOSITORY_URL> AI-Agent-Olympics
+git clone https://github.com/arun-srinivasan-builds/ai-agent-olympics.git AI-Agent-Olympics
 cd AI-Agent-Olympics
 ```
 
@@ -77,41 +87,75 @@ For later updates:
 
 ```bash
 cd /docker/apps/AI-Agent-Olympics
-git pull origin main
+git pull --ff-only origin main
 ```
 
 ---
 
 ## 4. Create the production `.env`
 
+Create the file from the safe template:
+
 ```bash
 cp .env.example .env
+chmod 600 .env
 nano .env
 ```
 
-Populate:
+Populate the real values directly on the VPS. Do not print the file contents in terminal output, logs, documentation, or chat.
 
-```text
-OPENAI_API_KEY=<production-key>
-SERPER_API_KEY=<production-key>
-AI_MODEL=gpt-4.1-mini
-EVAL_MODEL=gpt-4.1-mini
-```
-
-Protect it:
+Safe variable-name-only validation:
 
 ```bash
-chmod 600 .env
+awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/{print $1}' .env
+```
+
+Expected names:
+
+```text
+OPENAI_API_KEY
+SERPER_API_KEY
+AI_MODEL
+EVAL_MODEL
 ```
 
 ---
 
-## 5. Build and run on the VPS
+## 5. VPS Compose layout
+
+The repository keeps two Compose files:
+
+```text
+docker-compose.yml       base/local runtime
+docker-compose.vps.yml   VPS Traefik routing override
+```
+
+The VPS override joins the existing shared Traefik network:
+
+```text
+n8n_default
+```
+
+Traefik routes HTTPS traffic directly to:
+
+```text
+ai-agent-olympics:8501
+```
+
+The private VPS troubleshooting route remains:
+
+```text
+127.0.0.1:8502 -> container:8501
+```
+
+---
+
+## 6. Build and run on the VPS
 
 ```bash
-docker compose build --no-cache
-docker compose up -d
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.vps.yml build --no-cache
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.vps.yml ps
 ```
 
 Expected status:
@@ -120,69 +164,90 @@ Expected status:
 ai-agent-olympics   Up ... (healthy)
 ```
 
-Validate locally on the VPS:
+Validate privately on the VPS:
 
 ```bash
-curl -I http://127.0.0.1:8501/_stcore/health
+curl -s http://127.0.0.1:8502/_stcore/health
 ```
 
-Expected response:
+Expected:
 
 ```text
-HTTP/1.1 200 OK
+ok
 ```
 
 ---
 
-## 6. Reverse proxy / public URL
+## 7. Traefik / HTTPS routing
 
-Expose the container through the VPS reverse proxy using a dedicated subdomain, for example:
-
-```text
-ai-agent-olympics.<your-domain>
-```
-
-Proxy target:
+Existing shared reverse proxy:
 
 ```text
-http://127.0.0.1:8501
+n8n-traefik-1
 ```
 
-Enable HTTPS before sharing the URL publicly.
+Shared Docker network:
+
+```text
+n8n_default
+```
+
+Public hostname:
+
+```text
+ai-agent-olympics.srv1965124.hstgr.cloud
+```
+
+The VPS override contains the Traefik labels and explicitly sets the Streamlit backend port to `8501`.
+
+Public validation:
+
+```bash
+curl -I https://ai-agent-olympics.srv1965124.hstgr.cloud
+```
+
+Expected:
+
+```text
+HTTP/2 200
+```
 
 ---
 
-## 7. Production validation checklist
+## 8. Production validation checklist
 
 - Dashboard loads without layout regressions.
 - Left navigation and approved Olympic UI remain intact.
 - All five event pages open correctly.
+- Challenge Question remains editable.
+- Reset to Benchmark Question restores the official prompt.
 - One controlled benchmark event runs successfully.
 - One custom question runs successfully.
 - `Run All 5 Benchmark Events` executes sequentially.
 - Official medal board remains frozen after live runs.
 - Latest-run tokens, duration, answer and evals update correctly.
 - Container reports `healthy`.
-- Public URL uses HTTPS.
-- `.env` is not committed or exposed.
+- Public URL returns HTTPS successfully.
+- `.env` remains ignored and is never printed or committed.
 
 ---
 
-## 8. Release/update procedure
+## 9. Release / update procedure
 
-After a code change is validated locally:
-
-```bash
-git pull origin main
-docker compose build
-docker compose up -d
-docker compose ps
-```
-
-If troubleshooting is needed:
+After changes are committed and pushed to `main`:
 
 ```bash
-docker compose logs --tail=200 ai-agent-olympics
+cd /docker/apps/AI-Agent-Olympics
+git pull --ff-only origin main
+docker compose -f docker-compose.yml -f docker-compose.vps.yml build
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.vps.yml ps
 ```
 
-Rollback to the previous Git commit if required, then rebuild the container.
+Health check:
+
+```bash
+curl -s http://127.0.0.1:8502/_stcore/health
+```
+
+Do not use diagnostic commands that print container environment values or the contents of `.env`.
