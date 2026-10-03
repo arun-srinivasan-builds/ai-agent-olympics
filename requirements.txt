@@ -6,3 +6,4 @@ openai>=3.0,<4
 openai-agents==0.22.3
 autogen-agentchat==0.7.5
 autogen-ext[openai]==0.7.5
+plotly>=5.24.1

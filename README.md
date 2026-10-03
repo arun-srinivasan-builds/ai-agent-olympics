@@ -953,7 +953,197 @@ All five experiments are complete.
 
 The project does not claim a universal framework winner.
 
-> Agent reliability depends on orchestration, evidence acquisition, failure handling, evaluation quality and instruction hierarchy — not only on the underlying model.
+The strongest overall learning is:
 
-Full report: `docs/FINAL-RESULTS.md`  
-Final validation: `docs/FINAL-VALIDATION.md`
+> Agent reliability depends on orchestration, evidence acquisition, failure handling,
+> evaluation quality and instruction hierarchy — not only on the underlying model.
+
+Full final report:
+
+```text
+docs/FINAL-RESULTS.md
+```
+
+Final validation:
+
+```text
+docs/FINAL-VALIDATION.md
+```
+
+## Premium Enterprise UI Layer
+
+The final Streamlit experience now uses a Delivery-Governance-inspired enterprise command-center pattern:
+
+- dark persistent left navigation panel
+- center workspace for benchmark data and live event execution
+- right-side executive insight rail
+- premium page headers and stronger typography hierarchy
+- Executive Medal Board for the five-event competition story
+- evidence-support and deterministic-check heatmaps
+- token and runtime comparison charts
+- progressive disclosure from executive result to detailed evals / traces
+
+The medal board intentionally shows **event-specific strengths** rather than declaring one universal framework winner.
+
+Design documentation:
+
+```text
+docs/ENTERPRISE-UI-UPGRADE.md
+```
+
+## Premium UI refinement — Delivery Governance alignment
+
+Final visual polish includes:
+
+- larger executive medal-board typography for easier scanability
+- lighter blue/purple telemetry palettes to reduce visual weight
+- compact event-specific live workflow strips in the Olympic Arena right rail
+- preserved Delivery Governance layout: dark left navigation, decision data in the center, explanatory context on the right
+
+The workflow strips are intentionally minimal and show the event execution path without turning the dashboard into a process-diagram page.
+
+
+# Approved Premium Dashboard UI
+
+The Streamlit application now uses the approved AI Agent Olympics enterprise dashboard layout.
+
+Key UI decisions:
+
+- persistent dark navy left navigation (no collapse/expand workflow)
+- main content visually joins the navigation shell, matching the Delivery Governance product pattern
+- top enterprise toolbar with search / utility actions
+- large executive hero message: **“The strongest story is not who ‘won’.”**
+- Olympic podium comparison using a single-agent visual for OpenAI Agents SDK and a multi-agent team visual for Microsoft AutoGen
+- Live Event Flow visible on the Overview and event workspaces
+- event medal board with event-specific outcomes rather than a universal framework winner
+- compact right-rail telemetry and key takeaways
+- direct left-menu access to each benchmark event
+- all detailed experiment execution, evals and Behind-the-Scenes traces remain available
+
+UI assets are stored under:
+
+```text
+assets/ui/
+```
+
+The approved dashboard UI regression is validated by:
+
+```bat
+python scripts\test_premium_ui.py
+```
+
+## Approved UI Baseline — Locked
+
+The Overview visual baseline is frozen against:
+
+```text
+docs/screenshots/APPROVED-DESIGN-SOURCE.png
+```
+
+Implementation rules:
+
+- Persistent dark-navy left navigation; no collapse control.
+- Manrope is the visible product UI font. IBM Plex Mono is reserved for code/trace content.
+- Large executive interpretation hero with the mountain/torch visual.
+- Single-agent OpenAI Agents SDK treatment vs multi-agent Microsoft AutoGen treatment.
+- Large decorative Olympic podium remains in the comparison section.
+- No hanging 1/2 badges on the lower profile cards.
+- Live Event Flow stays visible on the Overview page.
+- Event Medal Board remains event-specific; it is not an overall universal-framework ranking.
+- All five experiment functions, evals and Behind-the-Scenes views remain functional.
+
+Regression check:
+
+```bat
+python scripts\test_approved_design_exact.py
+```
+
+## Olympic Arena event launcher
+
+The Olympic Arena no longer uses a compact event dropdown. All five events remain visible and the Arena now supports two explicit execution modes:
+
+- **Controlled Benchmark** — runs the validated Olympic question and fixture for repeatable, comparable results.
+- **Custom Experiment** — lets the user select an event, enter a custom challenge question, reset back to the benchmark question, and run both frameworks against that custom task.
+
+Custom experiments are clearly labelled as exploratory. They can update the latest session result, but they **do not change the official medal board or validated benchmark findings**. For Broken Tool Relay, Misinformation, Prompt Injection and Budget Marathon, the underlying controlled fixture remains fixed so the custom question is still tested inside the intended event pressure scenario.
+
+The latest result view also shows whether the current run came from the controlled benchmark or a custom experiment.
+
+Regression check:
+
+```bat
+python scripts\test_arena_custom_question.py
+```
+
+## Olympic Arena — Batch Run
+
+The Arena supports both individual event execution and a **Run All 5 Benchmark Events** action.
+
+The batch action executes the five validated events **sequentially** rather than in parallel. This preserves the benchmark's independent timing behavior and avoids mixing concurrent model/search traffic into event measurements.
+
+The batch run:
+
+- runs Research Sprint
+- runs Broken Tool Relay
+- runs Misinformation Challenge
+- runs Prompt Injection Hurdle
+- runs Budget Marathon
+- preserves each comparison result in session state
+- continues to the next event if one event fails
+- shows a completion summary at the end
+
+Because this is a live benchmark action, it uses real configured model/API calls.
+
+## AI-Relevant Hero Visual
+
+The approved Olympic visual shell is retained, but the scenic banner now communicates the framework architecture directly: **one OpenAI-style single agent versus a small Microsoft AutoGen multi-agent team**, separated by an AI torch / Olympic comparison motif. This keeps the concept visible before the user reads any benchmark detail.
+
+## Live Arena question workspace — V6
+
+The Olympic Arena now keeps the challenge question visible at all times.
+
+- **Controlled Benchmark**: shows the official validated question as a locked text box.
+- **Custom Experiment**: turns the same workspace into an editable question box.
+- Five visible event tabs switch which question is being configured; there is no event dropdown.
+- Every event card also shows a concise preview of its official question.
+- `Run Benchmark` uses the validated official question.
+- `Run Custom Experiment` uses the user's entered question.
+- Custom runs never overwrite the official medal board or validated benchmark findings.
+- `Run All 5 Benchmark Events` continues to use official questions only.
+
+
+## V8 UI refinement
+
+Olympic Arena action buttons are now compact rather than full-width. This changes only action-control sizing; the approved dashboard visual system remains locked.
+
+---
+
+# Docker + VPS Deployment
+
+The frozen V8 application is container-ready for portfolio publishing.
+
+Production runtime:
+
+```text
+Python 3.11
+Streamlit 8501
+Non-root Docker user
+Container health check enabled
+Environment secrets loaded from .env
+```
+
+Local validation:
+
+```bat
+docker compose build --no-cache
+docker compose up -d
+docker compose ps
+```
+
+Detailed deployment guide:
+
+```text
+docs/DOCKER-VPS-DEPLOYMENT.md
+```
+
+The approved UI is frozen. Dockerization does not change benchmark results, event behavior, or the validated medal board.
