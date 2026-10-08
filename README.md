@@ -1,6 +1,6 @@
 # 🏅 AI Agent Olympics
 
-**Enterprise Agent Reliability & Efficiency Lab**
+**Build & Forge · Agent Evaluation Experiment**
 
 AI Agent Olympics is a controlled benchmark comparing **OpenAI Agents SDK** and **Microsoft AutoGen AgentChat** across five operating-pressure scenarios: research, tool failure, misinformation, prompt injection, and efficiency.
 
@@ -126,19 +126,19 @@ See [EXPERIMENT-METHODOLOGY.md](docs/EXPERIMENT-METHODOLOGY.md) for the full met
                                 |
                     Metrics + Evidence + Traces
                                 |
-                         Enterprise UI
+                         Experiment Dashboard
 ```
 
 Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## Enterprise dashboard
+## Experiment dashboard
 
 The Streamlit application includes:
 
-- persistent enterprise navigation
-- executive benchmark overview
+- persistent dashboard navigation
+- benchmark overview
 - event-specific medal board
 - live event flow visualization
 - single-agent vs multi-agent visual comparison
@@ -166,11 +166,11 @@ ai-agent-olympics/
 ├── scripts/                   # Regression and validation tests
 ├── assets/ui/                 # Dashboard visual assets
 ├── docs/                      # Architecture, event docs, findings and deployment
-├── Dockerfile                 # Production container image
+├── Dockerfile                 # Container image
 ├── docker-compose.yml         # Local Docker runtime
 ├── requirements.txt           # Python dependencies
 ├── .env.example               # Safe environment-variable template
-└── README.md                  # Portfolio entry point
+└── README.md                  # Project overview
 ```
 
 For a detailed documentation index, see [docs/README.md](docs/README.md).
