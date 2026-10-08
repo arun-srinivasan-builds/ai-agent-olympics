@@ -1,5 +1,22 @@
 # 🏅 AI Agent Olympics
 
+<!-- portfolio-readme-overview -->
+## At a glance
+
+**Category:** Build & Forge · Agent evaluation experiment  
+**Focus:** A controlled learning experiment comparing OpenAI Agents SDK and Microsoft AutoGen across research, tool recovery, misinformation, prompt injection and efficiency.
+
+**Scope:** The benchmark focuses on observed outcomes, evaluation quality, guardrails and resource use—not a universal framework winner.
+
+### Explore
+
+- **How it works:** See the architecture and workflow sections below.
+- **How it is checked:** See guardrails, evaluations, tests and recorded findings below.
+- **How to run it:** See the local setup and Docker instructions below, where provided.
+
+<!-- /portfolio-readme-overview -->
+
+
 **Build & Forge · Agent Evaluation Experiment**
 
 AI Agent Olympics is a controlled benchmark comparing **OpenAI Agents SDK** and **Microsoft AutoGen AgentChat** across five operating-pressure scenarios: research, tool failure, misinformation, prompt injection, and efficiency.
